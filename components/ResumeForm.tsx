@@ -14,14 +14,18 @@ const ResumeForm: React.FC<ResumeFormProps> = ({ resumeData, setResumeData }) =>
         setResumeData(prev => ({ ...prev, personalInfo: { ...prev.personalInfo, [name]: value } }));
     };
 
+    // Fix: Correctly type generic array handlers to prevent type errors.
+    // The `section` parameter is now constrained to keys of ResumeData that are arrays.
+    // The type assertion `as unknown as T[]` is used to safely handle the dynamic property access,
+    // which TypeScript cannot fully infer on its own.
     // Generic handler for array items
     const handleArrayChange = <T extends { id: string }>(
-        section: keyof ResumeData,
+        section: Exclude<keyof ResumeData, 'personalInfo'>,
         index: number,
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
     ) => {
         const { name, value } = e.target;
-        const list = resumeData[section] as T[];
+        const list = resumeData[section] as unknown as T[];
         const updatedList = list.map((item, i) => (i === index ? { ...item, [name]: name === 'years' ? parseInt(value) || 0 : value } : item));
         setResumeData(prev => ({ ...prev, [section]: updatedList }));
     };
@@ -32,14 +36,17 @@ const ResumeForm: React.FC<ResumeFormProps> = ({ resumeData, setResumeData }) =>
         setResumeData(prev => ({ ...prev, experience: updatedExperience }));
     };
 
+    // Fix: Updated generic add/remove handlers for type safety.
+    // This prevents runtime errors by ensuring these functions only operate on array fields
+    // and correctly handles type assertions for dynamic updates.
     // Generic add/remove handlers
-    const addArrayItem = <T,>(section: keyof ResumeData, newItem: T) => {
-        const list = resumeData[section] as T[];
+    const addArrayItem = <T extends { id: string }>(section: Exclude<keyof ResumeData, 'personalInfo'>, newItem: T) => {
+        const list = resumeData[section] as unknown as T[];
         setResumeData(prev => ({ ...prev, [section]: [...list, newItem] }));
     };
 
-    const removeArrayItem = (section: keyof ResumeData, index: number) => {
-        const list = resumeData[section] as any[];
+    const removeArrayItem = (section: Exclude<keyof ResumeData, 'personalInfo'>, index: number) => {
+        const list = resumeData[section] as { id: string }[];
         setResumeData(prev => ({ ...prev, [section]: list.filter((_, i) => i !== index) }));
     };
 
