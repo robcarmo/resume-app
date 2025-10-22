@@ -1,0 +1,5 @@
+{
+  "name": "AI Resume Formatter",
+  "description": "An application to format your resume using predefined templates and AI-powered customization. Input your details, choose a style, refine it with simple commands, and download the final PDF.",
+  "requestFramePermissions": []
+}
