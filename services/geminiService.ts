@@ -147,57 +147,41 @@ You are an expert resume parser. Your task is to extract information from the fo
 4.  **No Fabricated Data**: If information for a field is not present in the text, use an empty string (\`""\`), an empty array (\`[]\`), or \`0\` for numbers. Do not invent information.
 5.  **Unique IDs**: For all array items (experience, education, etc.), generate a unique string ID (e.g., "exp1", "edu1", "skill1").
 
-**SECTION NAME VARIATIONS TO RECOGNIZE:**
-- **Professional Summary**: "Professional Summary", "Summary", "Profile", "Objective", "Career Summary", "Executive Summary", "About Me"
-- **Experience**: "Professional Experience", "Work Experience", "Experience", "Professional History", "Work History", "Employment History", "Career History", "Relevant Experience"
-- **Education**: "Education", "Academic Background", "Educational Background", "Academic Qualifications"
-- **Skills**: "Skills", "Technical Skills", "Core Technical Competencies", "Core Technical Skills & Expertise", "Core Tech Stack & Skills", "Technical Competencies", "Core Competencies", "Technologies", "Tools & Technologies", "Technical Proficiencies", "Expertise", "Methodologies & Leadership"
-- **Certifications**: "Certifications", "Professional Certifications", "Certificates", "Training", "Professional Development", "Recent Training", "Recent Specialization Training", "Licenses and Certifications", "Professional Training"
-- **Key Architectural Projects**: "Key Architectural Projects", "Selected Projects", "Highlighted Projects", "Recently Completed Projects", "Selected Architectural Projects", "Key Projects", "Architectural Projects", "Major Projects", "Notable Projects", "Featured Projects"
-- **Projects**: "Projects", "Personal Projects", "Side Projects", "Portfolio", "Open Source Contributions"
+**Enhanced Section Recognition - Look for these variations:**
 
-**Detailed Section Parsing Rules:**
--   **personalInfo**:
-    -   **Source**: Usually at the top of the resume, sometimes without a clear header ("Contact Information").
+-   **personalInfo & Summary**:
+    -   **Source**: Usually at the top of the resume, sometimes without a clear header.
     -   **Content**: Extract name, contact details (email, phone, website/LinkedIn), and location.
-    -   **Summary**: Look for a paragraph under any of the Professional Summary variations. This paragraph should go into the \`summary\` field.
+    -   **Summary Headers**: "Professional Summary", "Summary", "Profile", "Objective", "Career Summary", "Executive Summary", "About Me", "Overview", "Professional Profile", "Career Objective", "Professional Overview"
 
 -   **experience**:
-    -   **Headers**: Any of the Experience variations listed above.
+    -   **Headers**: "Professional Experience", "Work Experience", "Experience", "Professional History", "Work History", "Employment History", "Career History", "Relevant Experience", "Employment", "Career Experience", "Professional Background", "Work Background"
     -   **Content**: Identify each separate job. 'description' MUST be an array of strings. Each string should be a distinct bullet point describing a responsibility or accomplishment.
-    -   **Technologies Sub-sections**: If a job entry has a "Technologies:", "Key Tech:", or similar subsection, extract all technologies from it. These technologies should be added to the main \`skills\` list, NOT to the job's \`description\` array.
+    -   **Technologies Sub-sections**: If a job entry has a "Technologies:", "Key Tech:", "Tech Stack:", or similar subsection, extract all technologies from it. These technologies should be added to the main \`skills\` list, NOT to the job's \`description\` array.
 
 -   **education**:
-    -   **Headers**: Any of the Education variations listed above.
+    -   **Headers**: "Education", "Educational Background", "Academic Background", "Academic Qualifications", "Qualifications", "Academic History", "Educational History"
     -   **Content**: Extract degree, institution, location, and graduation date.
 
 -   **certifications**:
-    -   **Headers**: Any of the Certifications variations listed above.
+    -   **Headers**: "Certifications", "Certificates", "Professional Certifications", "Credentials", "Licenses", "Professional Development", "Training", "Recent Training", "Recent Specialization Training", "Professional Training"
     -   **Content**: List any professional certifications or training programs found.
 
 -   **skills**:
-    -   **Headers**: Any of the Skills variations listed above.
+    -   **Headers**: "Skills", "Technical Skills", "Core Technical Competencies", "Core Technical Skills & Expertise", "Core Tech Stack & Skills", "Technical Competencies", "Core Competencies", "Technologies", "Tools & Technologies", "Technical Proficiencies", "Expertise", "Methodologies & Leadership", "Technical Expertise", "Technology Stack", "Programming Languages", "Frameworks", "Tools"
     -   **Content**: List technical skills like programming languages, frameworks, software, and tools. Also include methodologies like Agile or Scrum.
-    -   **Flatten Sub-categories**: If skills are listed under sub-categories (e.g., "Cloud Platforms:", "Databases:"), collect all skills from all sub-categories and put them into the single \`skills\` array.
+    -   **Flatten Sub-categories**: If skills are listed under sub-categories (e.g., "Cloud Platforms:", "Databases:", "Programming Languages:", "Frameworks:"), collect all skills from all sub-categories and put them into the single \`skills\` array.
     -   **Source from Experience**: Also aggregate any technologies found in "Technologies:" subsections under each job in the "Professional Experience" section.
     -   **IMPORTANT**: The 'years' property for each skill MUST be \`0\`.
     -   **EXCLUDE**: Do not include soft skills. Explicitly ignore sections titled "Soft Skills" or "Soft Skills & Leadership". Do not extract items like "Communication", "Teamwork", or "Leadership".
 
 -   **keyArchitecturalProjects**:
-    -   **Headers**: Any of the Key Architectural Projects variations listed above.
+    -   **Headers**: "Key Architectural Projects", "Selected Projects", "Highlighted Projects", "Recently Completed Projects", "Selected Architectural Projects", "Key Projects", "Architectural Projects", "Notable Projects", "Featured Projects", "Major Projects"
     -   **Content**: This section is for a curated list of important projects. If you find a section with one of these titles, map its content here. This is distinct from the general 'projects' section.
 
 -   **projects**:
-    -   **Headers**: Any of the Projects variations listed above.
+    -   **Headers**: "Projects", "Personal Projects", "Side Projects", "Open Source Projects", "Technical Projects", "Professional Projects"
     -   **Content**: Parse project name, description, and link from a general projects section. If both a "Key Architectural Projects" (or its aliases) and a "Projects" section exist, parse them into their respective fields.
-
-**PARSING INSTRUCTIONS:**
-- For skills sections with sub-categories (e.g., "Cloud Platforms:", "Databases:"), flatten all technologies into a single skills array
-- Extract technologies mentioned in job descriptions under "Technologies:" subsections
-- Exclude soft skills sections from technical skills extraction
-- Be flexible with section boundaries and formatting variations
-- If a section header partially matches any variation above, include its content
-- Ignore sections that don't map to the expected structure
 
 **Final Check:**
 -   Ignore sections that don't map to the schema, such as "Key Achievements & Impact" or "Core Competencies & Impact" if they are standalone sections and not part of a job description.
@@ -231,18 +215,29 @@ ${resumeText}
 
 export const improveResumeContent = async (resumeData: ResumeData, prompt: string): Promise<ResumeData> => {
     try {
+        // Create a deep copy to ensure we're working with fresh data
+        const currentData = JSON.parse(JSON.stringify(resumeData));
+        
         const fullPrompt = `
 You are an expert resume writer and career coach. Your task is to revise the provided resume content in JSON format based on the user's request.
 
 **Core Task:**
 Analyze the user's request and intelligently update the provided JSON object of resume data. Your revisions should be professional and aimed at making the resume more effective.
 
-**CRITICAL RULES:**
-1.  **Return a Complete JSON Object**: You MUST return the complete, valid JSON object that conforms to the provided schema. It must include ALL original keys and data structures. Do not omit any sections.
-2.  **Targeted Revisions**: Only modify the parts of the resume mentioned in the user's request. For example, if asked to rewrite the summary, do not change the work experience.
-3.  **Preserve IDs**: Do not change the 'id' fields for any items in arrays (experience, education, etc.).
-4.  **No Structural Changes**: Do not add or remove keys from the JSON object. Adhere strictly to the provided schema.
-5.  **No Action on Ambiguity**: If the user's request is unclear, unrelated to resume content, or cannot be reasonably addressed, you MUST return the 'resumeData' object completely unmodified.
+**CRITICAL RULES - DATA PRESERVATION:**
+1.  **NEVER REMOVE OR DELETE ANY EXISTING INFORMATION**: You must preserve ALL existing data including job titles, company names, dates, skills, education details, certifications, and project information.
+2.  **NEVER LEAVE ANY SECTION EMPTY**: If a section had content before, it must have content after. Do not remove or empty any arrays or strings that previously contained data.
+3.  **PRESERVE ALL IDs**: Do not change the 'id' fields for any items in arrays (experience, education, etc.).
+4.  **MAINTAIN FACTUAL ACCURACY**: Keep all factual information (dates, company names, job titles, degree names, etc.) exactly as provided.
+5.  **COMPLETE JSON OBJECT**: Return the complete, valid JSON object that conforms to the provided schema with ALL original keys and data structures.
+
+**ENHANCEMENT GUIDELINES:**
+- Only enhance, refine, and improve existing content
+- Improve language clarity and professional tone
+- Strengthen action verbs and impact statements
+- Refine descriptions while maintaining all technical details
+- Ensure consistent formatting
+- If the request is unclear or cannot be reasonably addressed, return the data completely unmodified
 
 **INPUTS:**
 
@@ -250,13 +245,13 @@ Analyze the user's request and intelligently update the provided JSON object of 
 "${prompt}"
 
 **2. Current Resume Data (JSON object):**
-${JSON.stringify(resumeData, null, 2)}
+${JSON.stringify(currentData, null, 2)}
 
 **EXAMPLE:**
 -   **User Request**: "Rewrite my summary to be more impactful for a senior software engineer role."
--   **Action**: You would rewrite the 'summary' string within the 'personalInfo' object and return the entire, updated JSON object.
+-   **Action**: You would enhance the 'summary' string within the 'personalInfo' object while keeping all other data exactly the same, and return the entire, updated JSON object.
 
-Now, based on the user's request, provide the updated and complete JSON object.
+Now, based on the user's request, provide the updated and complete JSON object with ALL original data preserved and enhanced.
 `;
 
         const response = await ai.models.generateContent({
@@ -271,12 +266,33 @@ Now, based on the user's request, provide the updated and complete JSON object.
         const jsonText = response.text.trim();
         const newResumeData = JSON.parse(jsonText) as Partial<ResumeData>;
         
-        // Normalize the data to prevent errors if the AI returns an incomplete object
-        return normalizeResumeData(newResumeData);
+        // Enhanced safety check: ensure no data loss by comparing with original
+        const safeData = normalizeResumeData(newResumeData);
+        
+        // Additional safety checks to prevent data loss
+        const finalData: ResumeData = {
+            personalInfo: {
+                name: safeData.personalInfo.name || currentData.personalInfo.name,
+                email: safeData.personalInfo.email || currentData.personalInfo.email,
+                phone: safeData.personalInfo.phone || currentData.personalInfo.phone,
+                website: safeData.personalInfo.website || currentData.personalInfo.website,
+                location: safeData.personalInfo.location || currentData.personalInfo.location,
+                summary: safeData.personalInfo.summary || currentData.personalInfo.summary,
+            },
+            experience: safeData.experience.length > 0 ? safeData.experience : currentData.experience,
+            education: safeData.education.length > 0 ? safeData.education : currentData.education,
+            certifications: safeData.certifications.length > 0 ? safeData.certifications : currentData.certifications,
+            skills: safeData.skills.length > 0 ? safeData.skills : currentData.skills,
+            projects: safeData.projects.length > 0 ? safeData.projects : currentData.projects,
+            keyArchitecturalProjects: safeData.keyArchitecturalProjects.length > 0 ? safeData.keyArchitecturalProjects : currentData.keyArchitecturalProjects,
+        };
+        
+        return finalData;
 
     } catch (error) {
         console.error("Error improving content with Gemini:", error);
-        throw new Error("Failed to improve content. The AI could not process the request. Please try a different prompt.");
+        // Return original data if improvement fails to prevent data loss
+        return resumeData;
     }
 };
 
