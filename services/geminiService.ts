@@ -143,31 +143,40 @@ You are an expert resume parser. Your task is to extract information from the fo
 **Core Instructions:**
 1.  **Strict Schema Adherence**: The final JSON object MUST strictly follow the provided schema. Do not add, remove, or rename any fields.
 2.  **Comprehensive Parsing**: Parse all sections. Return all sections as defined in the schema, even if they are empty arrays (e.g., \`"projects": []\`).
-3.  **Flexible Section Identification**: This is the most critical step. Resumes have varied formatting. Be flexible and look for common heading variations and aliases. A section's content continues until a new section header is found. For example, 'Work History' should be mapped to the 'experience' section.
+3.  **Flexible Section Identification**: This is the most critical step. Resumes have varied formatting. Be flexible and look for common heading variations and aliases. A section's content continues until a new section header is found.
 4.  **No Fabricated Data**: If information for a field is not present in the text, use an empty string (\`""\`), an empty array (\`[]\`), or \`0\` for numbers. Do not invent information.
 5.  **Unique IDs**: For all array items (experience, education, etc.), generate a unique string ID (e.g., "exp1", "edu1", "skill1").
 
-**Detailed Section Parsing Rules & Aliases:**
+**SECTION NAME VARIATIONS TO RECOGNIZE:**
+- **Professional Summary**: "Professional Summary", "Summary", "Profile", "Objective", "Career Summary", "Executive Summary", "About Me"
+- **Experience**: "Professional Experience", "Work Experience", "Experience", "Professional History", "Work History", "Employment History", "Career History", "Relevant Experience"
+- **Education**: "Education", "Academic Background", "Educational Background", "Academic Qualifications"
+- **Skills**: "Skills", "Technical Skills", "Core Technical Competencies", "Core Technical Skills & Expertise", "Core Tech Stack & Skills", "Technical Competencies", "Core Competencies", "Technologies", "Tools & Technologies", "Technical Proficiencies", "Expertise", "Methodologies & Leadership"
+- **Certifications**: "Certifications", "Professional Certifications", "Certificates", "Training", "Professional Development", "Recent Training", "Recent Specialization Training", "Licenses and Certifications", "Professional Training"
+- **Key Architectural Projects**: "Key Architectural Projects", "Selected Projects", "Highlighted Projects", "Recently Completed Projects", "Selected Architectural Projects", "Key Projects", "Architectural Projects", "Major Projects", "Notable Projects", "Featured Projects"
+- **Projects**: "Projects", "Personal Projects", "Side Projects", "Portfolio", "Open Source Contributions"
+
+**Detailed Section Parsing Rules:**
 -   **personalInfo**:
     -   **Source**: Usually at the top of the resume, sometimes without a clear header ("Contact Information").
     -   **Content**: Extract name, contact details (email, phone, website/LinkedIn), and location.
-    -   **Summary**: Look for a paragraph under headers like "Summary", "Professional Summary", or "Objective". This paragraph should go into the \`summary\` field.
+    -   **Summary**: Look for a paragraph under any of the Professional Summary variations. This paragraph should go into the \`summary\` field.
 
 -   **experience**:
-    -   **Headers**: "Professional Experience", "Work Experience", "Experience", "Professional History".
+    -   **Headers**: Any of the Experience variations listed above.
     -   **Content**: Identify each separate job. 'description' MUST be an array of strings. Each string should be a distinct bullet point describing a responsibility or accomplishment.
     -   **Technologies Sub-sections**: If a job entry has a "Technologies:", "Key Tech:", or similar subsection, extract all technologies from it. These technologies should be added to the main \`skills\` list, NOT to the job's \`description\` array.
 
 -   **education**:
-    -   **Headers**: "Education", "Academic Background".
+    -   **Headers**: Any of the Education variations listed above.
     -   **Content**: Extract degree, institution, location, and graduation date.
 
 -   **certifications**:
-    -   **Headers**: "Certifications", "Professional Certifications", "Training", "Professional Development", "Recent Training", "Recent Specialization Training".
+    -   **Headers**: Any of the Certifications variations listed above.
     -   **Content**: List any professional certifications or training programs found.
 
 -   **skills**:
-    -   **Headers**: "Skills", "Technical Skills", "Core Technical Competencies", "Core Technical Skills & Expertise", "Core Tech Stack & Skills", "Methodologies & Leadership", "Core Technical Competencies".
+    -   **Headers**: Any of the Skills variations listed above.
     -   **Content**: List technical skills like programming languages, frameworks, software, and tools. Also include methodologies like Agile or Scrum.
     -   **Flatten Sub-categories**: If skills are listed under sub-categories (e.g., "Cloud Platforms:", "Databases:"), collect all skills from all sub-categories and put them into the single \`skills\` array.
     -   **Source from Experience**: Also aggregate any technologies found in "Technologies:" subsections under each job in the "Professional Experience" section.
@@ -175,12 +184,20 @@ You are an expert resume parser. Your task is to extract information from the fo
     -   **EXCLUDE**: Do not include soft skills. Explicitly ignore sections titled "Soft Skills" or "Soft Skills & Leadership". Do not extract items like "Communication", "Teamwork", or "Leadership".
 
 -   **keyArchitecturalProjects**:
-    -   **Headers**: "Key Architectural Projects", "Selected Projects", "Highlighted Projects", "Recently Completed Projects", "Selected Architectural Projects", "Key Projects", "Architectural Projects".
+    -   **Headers**: Any of the Key Architectural Projects variations listed above.
     -   **Content**: This section is for a curated list of important projects. If you find a section with one of these titles, map its content here. This is distinct from the general 'projects' section.
 
 -   **projects**:
-    -   **Headers**: "Projects", "Personal Projects".
+    -   **Headers**: Any of the Projects variations listed above.
     -   **Content**: Parse project name, description, and link from a general projects section. If both a "Key Architectural Projects" (or its aliases) and a "Projects" section exist, parse them into their respective fields.
+
+**PARSING INSTRUCTIONS:**
+- For skills sections with sub-categories (e.g., "Cloud Platforms:", "Databases:"), flatten all technologies into a single skills array
+- Extract technologies mentioned in job descriptions under "Technologies:" subsections
+- Exclude soft skills sections from technical skills extraction
+- Be flexible with section boundaries and formatting variations
+- If a section header partially matches any variation above, include its content
+- Ignore sections that don't map to the expected structure
 
 **Final Check:**
 -   Ignore sections that don't map to the schema, such as "Key Achievements & Impact" or "Core Competencies & Impact" if they are standalone sections and not part of a job description.
