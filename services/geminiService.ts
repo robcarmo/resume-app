@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import type { ResumeData, CustomStyles } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -136,63 +136,25 @@ const normalizeResumeData = (data: Partial<ResumeData>): ResumeData => {
 
 
 export const parseResumeText = async (resumeText: string): Promise<ResumeData> => {
+    let response: GenerateContentResponse | undefined;
     try {
+        // Refined and simplified prompt for better consistency
         const prompt = `
-You are an expert resume parser. Your task is to extract information from the following raw text from a resume and structure it into a JSON object that conforms to the provided schema. You must be very flexible with section titles, as they vary widely.
+You are an expert resume parser. Your task is to extract information from the provided resume text and structure it into a JSON object that strictly conforms to the provided schema.
 
-**Core Instructions:**
-1.  **Strict Schema Adherence**: The final JSON object MUST strictly follow the provided schema. Do not add, remove, or rename any fields.
-2.  **Comprehensive Parsing**: Parse all sections. Return all sections as defined in the schema, even if they are empty arrays (e.g., \`"projects": []\`).
-3.  **Flexible Section Identification**: This is the most critical step. Resumes have varied formatting. Be flexible and look for common heading variations and aliases. A section's content continues until a new section header is found.
-4.  **No Fabricated Data**: If information for a field is not present in the text, use an empty string (\`""\`), an empty array (\`[]\`), or \`0\` for numbers. Do not invent information.
-5.  **Unique IDs**: For all array items (experience, education, etc.), generate a unique string ID (e.g., "exp1", "edu1", "skill1").
+**Key Instructions:**
+1.  **Schema Adherence**: Strictly follow the provided JSON schema. Return ALL fields defined in the schema, using \`[]\` for empty arrays and \`""\` for empty strings.
+2.  **ID Generation**: For all items in arrays (e.g., experience, education), generate a unique string ID (like "exp1", "edu1").
+3.  **Skills**: The 'years' property for each skill MUST be \`0\`.
+4.  **Intelligent Mapping**: Intelligently map common resume section headers (e.g., "Work History") to the correct schema fields (e.g., "experience").
+5.  **Clean Output**: Your final output must be ONLY the raw JSON object, with no surrounding text, explanations, or markdown formatting.
 
-**Enhanced Section Recognition - Look for these variations:**
-
--   **personalInfo & Summary**:
-    -   **Source**: Usually at the top of the resume, sometimes without a clear header.
-    -   **Content**: Extract name, contact details (email, phone, website/LinkedIn), and location.
-    -   **Summary Headers**: "Professional Summary", "Summary", "Profile", "Objective", "Career Summary", "Executive Summary", "About Me", "Overview", "Professional Profile", "Career Objective", "Professional Overview"
-
--   **experience**:
-    -   **Headers**: "Professional Experience", "Work Experience", "Experience", "Professional History", "Work History", "Employment History", "Career History", "Relevant Experience", "Employment", "Career Experience", "Professional Background", "Work Background"
-    -   **Content**: Identify each separate job. 'description' MUST be an array of strings. Each string should be a distinct bullet point describing a responsibility or accomplishment.
-    -   **Technologies Sub-sections**: If a job entry has a "Technologies:", "Key Tech:", "Tech Stack:", or similar subsection, extract all technologies from it. These technologies should be added to the main \`skills\` list, NOT to the job's \`description\` array.
-
--   **education**:
-    -   **Headers**: "Education", "Educational Background", "Academic Background", "Academic Qualifications", "Qualifications", "Academic History", "Educational History"
-    -   **Content**: Extract degree, institution, location, and graduation date.
-
--   **certifications**:
-    -   **Headers**: "Certifications", "Certificates", "Professional Certifications", "Credentials", "Licenses", "Professional Development", "Training", "Recent Training", "Recent Specialization Training", "Professional Training"
-    -   **Content**: List any professional certifications or training programs found.
-
--   **skills**:
-    -   **Headers**: "Skills", "Technical Skills", "Core Technical Competencies", "Core Technical Skills & Expertise", "Core Tech Stack & Skills", "Technical Competencies", "Core Competencies", "Technologies", "Tools & Technologies", "Technical Proficiencies", "Expertise", "Methodologies & Leadership", "Technical Expertise", "Technology Stack", "Programming Languages", "Frameworks", "Tools"
-    -   **Content**: List technical skills like programming languages, frameworks, software, and tools. Also include methodologies like Agile or Scrum.
-    -   **Flatten Sub-categories**: If skills are listed under sub-categories (e.g., "Cloud Platforms:", "Databases:", "Programming Languages:", "Frameworks:"), collect all skills from all sub-categories and put them into the single \`skills\` array.
-    -   **Source from Experience**: Also aggregate any technologies found in "Technologies:" subsections under each job in the "Professional Experience" section.
-    -   **IMPORTANT**: The 'years' property for each skill MUST be \`0\`.
-    -   **EXCLUDE**: Do not include soft skills. Explicitly ignore sections titled "Soft Skills" or "Soft Skills & Leadership". Do not extract items like "Communication", "Teamwork", or "Leadership".
-
--   **keyArchitecturalProjects**:
-    -   **Headers**: "Key Architectural Projects", "Selected Projects", "Highlighted Projects", "Recently Completed Projects", "Selected Architectural Projects", "Key Projects", "Architectural Projects", "Notable Projects", "Featured Projects", "Major Projects"
-    -   **Content**: This section is for a curated list of important projects. If you find a section with one of these titles, map its content here. This is distinct from the general 'projects' section.
-
--   **projects**:
-    -   **Headers**: "Projects", "Personal Projects", "Side Projects", "Open Source Projects", "Technical Projects", "Professional Projects"
-    -   **Content**: Parse project name, description, and link from a general projects section. If both a "Key Architectural Projects" (or its aliases) and a "Projects" section exist, parse them into their respective fields.
-
-**Final Check:**
--   Ignore sections that don't map to the schema, such as "Key Achievements & Impact" or "Core Competencies & Impact" if they are standalone sections and not part of a job description.
--   Ensure all fields from the schema are present in the final JSON, even if they are empty.
-
-Raw Resume Text:
+**Raw Resume Text:**
 ---
 ${resumeText}
 ---
-        `;
-        const response = await ai.models.generateContent({
+`;
+        response = await ai.models.generateContent({
             model: "gemini-2.5-pro",
             contents: prompt,
             config: {
@@ -201,7 +163,18 @@ ${resumeText}
             },
         });
         
-        const jsonText = response.text.trim();
+        // More robust cleanup of the AI's response to extract the JSON object.
+        let jsonText = response.text.trim();
+        const firstBrace = jsonText.indexOf('{');
+        const lastBrace = jsonText.lastIndexOf('}');
+
+        if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
+            console.error("AI response did not contain a valid JSON object.", { responseText: jsonText });
+            throw new Error("The AI's response was malformed and did not contain valid data.");
+        }
+        
+        jsonText = jsonText.substring(firstBrace, lastBrace + 1);
+        
         const parsedData = JSON.parse(jsonText) as Partial<ResumeData>;
 
         // Ensure all array fields exist even if empty by normalizing the data
@@ -209,7 +182,26 @@ ${resumeText}
 
     } catch (error) {
         console.error("Error parsing resume with Gemini:", error);
-        throw new Error("Failed to extract data from resume. The AI model could not understand the format.");
+        
+        // Improved error handling to give more specific feedback.
+        if (error instanceof SyntaxError) {
+            console.error("The AI returned text that could not be parsed as JSON.");
+            if (response?.text) {
+                console.error("Received text from AI:", response.text);
+            }
+            throw new Error("Failed to parse the resume. The AI's response was not in a valid JSON format. This can sometimes happen with unique resume layouts.");
+        }
+        
+        // Basic check for API-related errors.
+        if (error && typeof error === 'object' && 'message' in error) {
+            const message = String(error.message).toLowerCase();
+            if (message.includes('api key')) {
+                throw new Error("The request to the AI service failed due to an API key issue. Please contact support.");
+            }
+        }
+        
+        // Fallback for other errors
+        throw new Error("Failed to extract data from the resume. The AI model could not understand the format. Please ensure your file is a text-based document (not an image) and try again.");
     }
 };
 
