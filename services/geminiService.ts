@@ -247,7 +247,7 @@ Now, based on the user's request, provide the updated and complete JSON object w
 `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.5-pro",
             contents: fullPrompt,
             config: {
                 responseMimeType: "application/json",
@@ -322,7 +322,7 @@ Now, based on the user's request, provide the updated and complete JSON object.
 `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.5-pro",
             contents: fullPrompt,
             config: {
                 responseMimeType: "application/json",
