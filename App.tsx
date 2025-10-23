@@ -14,6 +14,21 @@ declare const jspdf: any;
 declare const html2canvas: any;
 declare const saveAs: any;
 
+const professionalStyles: CustomStyles = {
+    container: 'font-sans text-gray-900 leading-normal',
+    header: 'border-b-2 border-blue-700 pb-2 mb-4',
+    name: 'text-blue-700 font-bold text-3xl',
+    contactInfo: 'text-xs text-gray-800',
+    sectionTitle: 'text-base font-bold text-blue-700 border-b-2 border-blue-700 pb-1 mb-3',
+    itemTitle: 'text-sm font-bold text-gray-900',
+    itemSubtitle: 'text-xs text-gray-700',
+    itemDate: 'text-xs text-gray-700',
+    summary: 'text-xs text-gray-800 leading-normal',
+    listItem: 'text-xs text-gray-800 leading-normal',
+    skillItem: 'text-xs text-gray-800',
+    itemList: 'text-xs',
+};
+
 const classicStyles: CustomStyles = {
     container: 'font-serif',
     name: 'text-4xl font-bold text-gray-800',
@@ -35,6 +50,7 @@ const modernStyles: CustomStyles = {
 };
 
 const initialStyles: Record<Template, CustomStyles> = {
+    professional: professionalStyles,
     classic: classicStyles,
     modern: modernStyles,
 };
@@ -42,8 +58,8 @@ const initialStyles: Record<Template, CustomStyles> = {
 
 const App: React.FC = () => {
     const [resumeData, setResumeData] = useState<ResumeData | null>(null);
-    const [template, setTemplate] = useState<Template>('classic');
-    const [customStyles, setCustomStyles] = useState<CustomStyles>(initialStyles.classic);
+    const [template, setTemplate] = useState<Template>('professional');
+    const [customStyles, setCustomStyles] = useState<CustomStyles>(initialStyles.professional);
     const [isStyling, setIsStyling] = useState(false);
     const [styleError, setStyleError] = useState<string | null>(null);
     const [isParsing, setIsParsing] = useState(false);
@@ -133,8 +149,9 @@ const App: React.FC = () => {
 
         // --- Template-specific styles ---
         const isModern = template === 'modern';
-        const font = isModern ? 'Arial' : 'Times New Roman';
-        const primaryColor = '2E3A87'; // Indigo for modern template
+        const isProfessional = template === 'professional';
+        const font = isModern ? 'Arial' : isProfessional ? 'Arial' : 'Times New Roman';
+        const primaryColor = isProfessional ? '1D4ED8' : '2E3A87'; // Blue-700 for professional, Indigo for modern
 
         const joinNonEmpty = (parts: (string | undefined | null)[], separator: string): string => {
             return parts.filter(p => p && p.trim()).join(separator);
@@ -145,9 +162,9 @@ const App: React.FC = () => {
             if (validChildren.length === 0) return [];
             return [
                 new docx.Paragraph({
-                    children: [new docx.TextRun({ text: title, bold: true, size: 28, color: isModern ? primaryColor : '000000' })],
+                    children: [new docx.TextRun({ text: title, bold: true, size: 28, color: (isModern || isProfessional) ? primaryColor : '000000' })],
                     spacing: { before: 400, after: 150 },
-                    border: isModern ? {} : { bottom: { color: "auto", space: 1, value: "single", size: 6 } },
+                    border: (isModern || isProfessional) ? { bottom: { color: primaryColor, space: 1, value: "single", size: 6 } } : { bottom: { color: "auto", space: 1, value: "single", size: 6 } },
                 }),
                 ...validChildren
             ];
@@ -191,13 +208,15 @@ const App: React.FC = () => {
         } else {
              headerChildren.push(
                 new docx.Paragraph({
-                    children: [new docx.TextRun({ text: personalInfo.name || 'Your Name', bold: true, size: 48 })],
+                    children: [new docx.TextRun({ text: personalInfo.name || 'Your Name', bold: true, size: 48, color: isProfessional ? primaryColor : '000000' })],
                     alignment: docx.AlignmentType.CENTER,
                     spacing: { after: 100 },
                 }),
                 new docx.Paragraph({
                     children: [new docx.TextRun({ text: contactInfoString, size: 20 })],
                     alignment: docx.AlignmentType.CENTER,
+                    border: isProfessional ? { bottom: { color: primaryColor, space: 1, value: "single", size: 6 } } : {},
+                    spacing: { after: 200 },
                 })
              );
         }
@@ -293,7 +312,7 @@ const App: React.FC = () => {
                     ...createSection('Professional Experience',
                         experience.flatMap((exp, i) => {
                             if (!exp.jobTitle && !exp.company && exp.description.every(d => !d.trim())) return [];
-                            return [
+                            const experienceElements = [
                                 new docx.Paragraph({
                                     children: [new docx.TextRun({ text: exp.jobTitle || 'Job Title', bold: true, size: 24 })],
                                     spacing: { before: i === 0 ? 100 : 200 },
@@ -310,6 +329,20 @@ const App: React.FC = () => {
                                     children: [new docx.TextRun(desc)], bullet: { level: 0 }, indentation: { left: 720 }, spacing: { after: 40 },
                                 })),
                             ];
+                            
+                            if (exp.keyTech && exp.keyTech.trim()) {
+                                experienceElements.push(
+                                    new docx.Paragraph({
+                                        children: [
+                                            new docx.TextRun({ text: 'Key Tech: ', bold: true }),
+                                            new docx.TextRun({ text: exp.keyTech })
+                                        ],
+                                        spacing: { after: 100, before: 40 },
+                                    })
+                                );
+                            }
+                            
+                            return experienceElements;
                         })
                     ),
 
