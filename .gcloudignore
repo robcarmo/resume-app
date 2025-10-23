@@ -1,0 +1,21 @@
+# Ignore node_modules
+node_modules/
+
+# Ignore development files
+.git/
+.gitignore
+.env
+.env.*
+
+# Ignore documentation
+README.md
+CODEBASE_ANALYSIS.md
+CODEBASE_ANALYSIS.pdf
+
+# Ignore test files
+test-*.html
+*.test.*
+*.spec.*
+
+# Ignore build artifacts that will be rebuilt
+# Note: dist/ should NOT be ignored as we need it for production
