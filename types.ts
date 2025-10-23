@@ -16,6 +16,7 @@ export interface Experience {
   startDate: string;
   endDate: string;
   description: string[];
+  keyTech?: string;
 }
 
 export interface Education {
@@ -72,4 +73,4 @@ export interface CustomStyles {
   skillItem?: string;
 }
 
-export type Template = 'classic' | 'modern';
+export type Template = 'classic' | 'modern' | 'professional';

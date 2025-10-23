@@ -9,6 +9,7 @@ interface TemplateSelectorProps {
 
 const TemplateSelector: React.FC<TemplateSelectorProps> = ({ selectedTemplate, onSelectTemplate }) => {
     const templates: { id: Template; name: string }[] = [
+        { id: 'professional', name: 'Professional' },
         { id: 'classic', name: 'Classic' },
         { id: 'modern', name: 'Modern' },
     ];
