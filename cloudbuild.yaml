@@ -1,0 +1,73 @@
+# Cloud Build configuration for AI Resume Formatter
+# This file automates building, pushing, and deploying the app to Cloud Run
+
+steps:
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'API_KEY=${_GEMINI_API_KEY}'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/resume-app:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/resume-app:latest'
+      - '.'
+    id: 'build-image'
+
+  # Step 2: Push the image with commit SHA tag
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/resume-app:$COMMIT_SHA'
+    id: 'push-sha-tag'
+
+  # Step 3: Push the image with latest tag
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/resume-app:latest'
+    id: 'push-latest-tag'
+
+  # Step 4: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'resume-app'
+      - '--image=gcr.io/$PROJECT_ID/resume-app:$COMMIT_SHA'
+      - '--region=us-east1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--port=8080'
+      - '--max-instances=10'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--timeout=300s'
+    id: 'deploy-cloud-run'
+
+# Images to be pushed to Container Registry
+images:
+  - 'gcr.io/$PROJECT_ID/resume-app:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/resume-app:latest'
+
+# Substitution variables
+# These can be set in the Cloud Build trigger or passed via command line
+substitutions:
+  _GEMINI_API_KEY: 'your-api-key-here'  # Default value (should be overridden)
+
+# Build options
+options:
+  # Use a larger machine type for faster builds
+  machineType: 'N1_HIGHCPU_8'
+  # Set timeout to 20 minutes
+  timeout: '1200s'
+  # Log to Cloud Logging
+  logging: CLOUD_LOGGING_ONLY
+
+# Tags for organizing builds
+tags:
+  - 'resume-app'
+  - 'cloud-run'
+  - 'automated-deployment'
