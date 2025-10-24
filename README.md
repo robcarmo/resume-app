@@ -32,10 +32,15 @@ View your app in AI Studio: https://ai.studio/apps/drive/170r_ZB3kyHo8jhtmkdwk4q
    ```
 
 2. **Set the Gemini API key:**
-   Create a `.env` file in the root directory:
+   Copy the example environment file and add your API key:
    ```bash
-   echo "VITE_GEMINI_API_KEY=your_gemini_api_key_here" > .env
+   cp .env.example .env
+   # Then edit .env and replace 'your_gemini_api_key_here' with your actual API key
+   # Or use this command:
+   echo "VITE_API_KEY=your_gemini_api_key_here" > .env
    ```
+   
+   Get your API key from [Google AI Studio](https://aistudio.google.com/)
 
 3. **Run the development server:**
    ```bash
@@ -308,6 +313,8 @@ The Dockerfile accepts the following build argument:
 - Restrict your API key by HTTP referrer in Google Cloud Console
 - Restrict to Generative Language API only
 - Set usage quotas to prevent abuse
+
+📖 **For detailed security guidance**, see [SECURITY.md](SECURITY.md)
 
 ### API Key Security Best Practices
 

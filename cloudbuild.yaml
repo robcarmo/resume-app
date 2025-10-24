@@ -54,8 +54,12 @@ images:
 
 # Substitution variables
 # These can be set in the Cloud Build trigger or passed via command line
+# ⚠️ CRITICAL: The default value below is a PLACEHOLDER and MUST be overridden!
+# Set the actual API key in your Cloud Build trigger configuration:
+# https://console.cloud.google.com/cloud-build/triggers
+# Under "Substitution variables", add: _GEMINI_API_KEY = your_actual_api_key
 substitutions:
-  _GEMINI_API_KEY: 'your-api-key-here'  # Default value (should be overridden)
+  _GEMINI_API_KEY: 'YOUR_API_KEY_HERE_OVERRIDE_IN_TRIGGER'  # ⚠️ MUST BE OVERRIDDEN IN CLOUD BUILD TRIGGER
 
 # Build options
 options:
