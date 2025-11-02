@@ -9,16 +9,15 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-# Using 'npm ci' is recommended for CI/CD environments as it's faster and more reliable
-RUN npm ci
+# Using 'npm install' to auto-update lock file when dependencies change
+RUN npm install
 
 # Copy the rest of the application source code
 COPY . .
 
-# Accept API_KEY as a build argument
-# This allows the API key to be embedded in the client-side code at build time
-ARG API_KEY
-ENV API_KEY=${API_KEY}
+# Accept Gemini API key as build argument
+ARG GEMINI_API_KEY
+ENV GEMINI_API_KEY=${GEMINI_API_KEY}
 
 # Build the application
 # This will create a 'dist' folder with the static files

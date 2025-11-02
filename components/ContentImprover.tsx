@@ -22,12 +22,41 @@ const ContentImprover: React.FC<ContentImproverProps> = ({ onImprove, isLoading 
                 <SparklesIcon className="w-5 h-5 mr-2 text-indigo-500" />
                 Improve Content with AI
             </h3>
-            <p className="text-sm text-gray-500 mb-3">Describe the changes you want. For example: "Rewrite my summary to be more impactful."</p>
+            <p className="text-sm text-gray-500 mb-2">Describe the changes you want, or try these examples:</p>
+            
+            {/* Quick example prompts */}
+            <div className="flex flex-wrap gap-2 mb-3">
+                <button
+                    type="button"
+                    onClick={() => setPrompt('Make all bullet points more concise without losing key information')}
+                    disabled={isLoading}
+                    className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition disabled:opacity-50"
+                >
+                    Make Concise
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setPrompt('Improve action verbs in experience section')}
+                    disabled={isLoading}
+                    className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition disabled:opacity-50"
+                >
+                    Better Verbs
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setPrompt('Rewrite summary to be more impactful')}
+                    disabled={isLoading}
+                    className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition disabled:opacity-50"
+                >
+                    Improve Summary
+                </button>
+            </div>
+            
             <form onSubmit={handleSubmit}>
                 <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="e.g., Make my experience bullet points start with strong action verbs."
+                    placeholder="e.g., Shorten all descriptions while keeping key achievements and metrics"
                     className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 transition text-sm"
                     rows={3}
                     disabled={isLoading}

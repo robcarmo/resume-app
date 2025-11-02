@@ -8,7 +8,7 @@ interface ResumePreviewProps {
     styles: CustomStyles;
 }
 
-const ResumePreview: React.FC<ResumePreviewProps> = ({ resumeRef, resumeData, styles }) => {
+const ResumePreview: React.FC<ResumePreviewProps> = React.memo(({ resumeRef, resumeData, styles }) => {
     const { personalInfo, experience, education, certifications, projects, skills, keyArchitecturalProjects } = resumeData;
 
     return (
@@ -149,6 +149,8 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({ resumeRef, resumeData, st
             </main>
         </div>
     );
-};
+});
+
+ResumePreview.displayName = 'ResumePreview';
 
 export default ResumePreview;

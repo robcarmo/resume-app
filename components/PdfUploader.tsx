@@ -1,8 +1,6 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { UploadIcon, DocumentIcon } from './icons';
 
-declare const mammoth: any;
-
 interface PdfUploaderProps {
     onParse: (text: string) => Promise<void>;
     isParsing: boolean;
@@ -29,10 +27,11 @@ const PdfUploader: React.FC<PdfUploaderProps> = ({ onParse, isParsing }) => {
                     try {
                         if (!e.target?.result) throw new Error('Could not read file.');
 
-                        const pdfjsLib = (window as any).pdfjsLib;
-                        if (!pdfjsLib) {
+                        if (!window.pdfjsLib) {
                             throw new Error('PDF processing library failed to load. Please check your internet connection and refresh the page.');
                         }
+                        
+                        const pdfjsLib = window.pdfjsLib;
 
                         const typedarray = new Uint8Array(e.target.result as ArrayBuffer);
                         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.6.347/pdf.worker.min.js`;
@@ -42,7 +41,25 @@ const PdfUploader: React.FC<PdfUploaderProps> = ({ onParse, isParsing }) => {
                             const page = await pdf.getPage(i);
                             const textContent = await page.getTextContent();
                             if (textContent.items.length === 0) continue;
-                            const pageText = textContent.items.map((item: { str: string }) => item.str).join(' ');
+                            
+                            // Sort items by Y position (top to bottom), then X position (left to right)
+                            // This helps with multi-column layouts
+                            const sortedItems = textContent.items
+                                .map((item: any) => ({
+                                    str: item.str,
+                                    y: item.transform[5], // Y position
+                                    x: item.transform[4], // X position
+                                }))
+                                .sort((a, b) => {
+                                    // Sort by Y first (top to bottom), with small tolerance for same line
+                                    const yDiff = Math.abs(a.y - b.y);
+                                    if (yDiff > 5) { // If vertical difference > 5 units, sort by Y
+                                        return b.y - a.y; // Descending Y (top first)
+                                    }
+                                    return a.x - b.x; // Same line, sort by X (left to right)
+                                });
+                            
+                            const pageText = sortedItems.map(item => item.str).join(' ');
                             fullText += pageText + '\n';
                         }
                         if (fullText.trim().length < 100) {
@@ -59,8 +76,13 @@ const PdfUploader: React.FC<PdfUploaderProps> = ({ onParse, isParsing }) => {
                 fileReader.onload = async (e) => {
                     try {
                         if (!e.target?.result) throw new Error('Could not read file.');
+                        
+                        if (!window.mammoth) {
+                            throw new Error('DOCX processing library failed to load. Please refresh the page.');
+                        }
+                        
                         const arrayBuffer = e.target.result as ArrayBuffer;
-                        const result = await mammoth.extractRawText({ arrayBuffer });
+                        const result = await window.mammoth.extractRawText({ arrayBuffer });
                         await onParse(result.value);
                     } catch (err) {
                         setError('Failed to process DOCX file. It might be corrupted or password-protected.');

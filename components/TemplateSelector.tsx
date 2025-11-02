@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { Template } from '../types';
 
 interface TemplateSelectorProps {
@@ -7,12 +7,13 @@ interface TemplateSelectorProps {
     onSelectTemplate: (template: Template) => void;
 }
 
-const TemplateSelector: React.FC<TemplateSelectorProps> = ({ selectedTemplate, onSelectTemplate }) => {
-    const templates: { id: Template; name: string }[] = [
+const TemplateSelector: React.FC<TemplateSelectorProps> = React.memo(({ selectedTemplate, onSelectTemplate }) => {
+    // Memoize templates array to prevent re-creation on every render
+    const templates = useMemo<{ id: Template; name: string }[]>(() => [
         { id: 'professional', name: 'Professional' },
         { id: 'classic', name: 'Classic' },
         { id: 'modern', name: 'Modern' },
-    ];
+    ], []);
 
     return (
         <div className="p-4 bg-white rounded-lg shadow-sm">
@@ -34,6 +35,8 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({ selectedTemplate, o
             </div>
         </div>
     );
-};
+});
+
+TemplateSelector.displayName = 'TemplateSelector';
 
 export default TemplateSelector;

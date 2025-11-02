@@ -1,18 +1,12 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import type { ResumeData, CustomStyles, Template } from './types';
-import { generateStyles, parseResumeText, improveResumeContent } from './services/geminiService';
+import { parseResumeText, improveResumeContent } from './services/geminiService';
 import ResumePreview from './components/ResumePreview';
 import TemplateSelector from './components/TemplateSelector';
-import CustomizationPanel from './components/CustomizationPanel';
 import PdfUploader from './components/PdfUploader';
 import { DownloadIcon, DocumentArrowDownIcon } from './components/icons';
 import OriginalResumeViewer from './components/OriginalResumeViewer';
 import ContentImprover from './components/ContentImprover';
-
-// Declare types for jspdf and html2canvas from CDN
-declare const jspdf: any;
-declare const html2canvas: any;
-declare const saveAs: any;
 
 const professionalStyles: CustomStyles = {
     container: 'font-sans text-gray-900 leading-normal',
@@ -55,40 +49,39 @@ const initialStyles: Record<Template, CustomStyles> = {
     modern: modernStyles,
 };
 
-
 const App: React.FC = () => {
     const [resumeData, setResumeData] = useState<ResumeData | null>(null);
     const [template, setTemplate] = useState<Template>('professional');
     const [customStyles, setCustomStyles] = useState<CustomStyles>(initialStyles.professional);
-    const [isStyling, setIsStyling] = useState(false);
-    const [styleError, setStyleError] = useState<string | null>(null);
     const [isParsing, setIsParsing] = useState(false);
+    const [parseStartTime, setParseStartTime] = useState<number | null>(null);
+    const [elapsedSeconds, setElapsedSeconds] = useState(0);
     const [parsingError, setParsingError] = useState<string | null>(null);
     const [originalResumeText, setOriginalResumeText] = useState<string | null>(null);
     const [isImproving, setIsImproving] = useState(false);
     const [improvingError, setImprovingError] = useState<string | null>(null);
 
     const resumeRef = useRef<HTMLDivElement>(null);
+    
+    // Update elapsed time every second during parsing
+    useEffect(() => {
+        if (!isParsing || !parseStartTime) {
+            setElapsedSeconds(0);
+            return;
+        }
+        
+        const interval = setInterval(() => {
+            setElapsedSeconds(Math.floor((Date.now() - parseStartTime) / 1000));
+        }, 1000);
+        
+        return () => clearInterval(interval);
+    }, [isParsing, parseStartTime]);
 
     const handleSelectTemplate = useCallback((selectedTemplate: Template) => {
         setTemplate(selectedTemplate);
         setCustomStyles(initialStyles[selectedTemplate]);
     }, []);
 
-    const handleStyleCustomize = async (prompt: string) => {
-        if (!resumeData) return;
-        setIsStyling(true);
-        setStyleError(null);
-        try {
-            const newStyles = await generateStyles(resumeData, customStyles, prompt);
-            setCustomStyles(newStyles);
-        } catch (err) {
-            setStyleError(err instanceof Error ? err.message : 'An unknown error occurred.');
-        } finally {
-            setIsStyling(false);
-        }
-    };
-    
     const handleImproveContent = async (prompt: string) => {
         if (!resumeData) return;
         setIsImproving(true);
@@ -110,7 +103,7 @@ const App: React.FC = () => {
         const originalShadow = element.style.boxShadow;
         element.style.boxShadow = 'none';
 
-        const canvas = await html2canvas(element, {
+        const canvas = await window.html2canvas(element, {
             scale: 2,
             useCORS: true,
         });
@@ -119,19 +112,36 @@ const App: React.FC = () => {
         
         const imgData = canvas.toDataURL('image/png');
         
-        const pdf = new jspdf.jsPDF({
+        const pdf = new window.jspdf.jsPDF({
             orientation: 'portrait',
             unit: 'mm',
             format: 'a4',
         });
 
         const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
         const canvasWidth = canvas.width;
         const canvasHeight = canvas.height;
-        const ratio = canvasHeight / canvasWidth;
-        const pdfImageHeight = pdfWidth * ratio;
         
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfImageHeight);
+        // Calculate scaling to fit PDF width
+        const ratio = pdfWidth / canvasWidth;
+        const scaledHeight = canvasHeight * ratio;
+        
+        // Add first page
+        let heightLeft = scaledHeight;
+        let position = 0;
+        
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, scaledHeight);
+        heightLeft -= pdfHeight;
+        
+        // Add additional pages if content exceeds one page
+        while (heightLeft > 0) {
+            position = heightLeft - scaledHeight;
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, scaledHeight);
+            heightLeft -= pdfHeight;
+        }
+        
         pdf.save('resume.pdf');
     };
     
@@ -150,8 +160,9 @@ const App: React.FC = () => {
         // --- Template-specific styles ---
         const isModern = template === 'modern';
         const isProfessional = template === 'professional';
-        const font = isModern ? 'Arial' : isProfessional ? 'Arial' : 'Times New Roman';
-        const primaryColor = isProfessional ? '1D4ED8' : '2E3A87'; // Blue-700 for professional, Indigo for modern
+        const isClassic = template === 'classic';
+        const font = isClassic ? 'Times New Roman' : 'Arial';
+        const primaryColor = isProfessional ? '1D4ED8' : isModern ? '4F46E5' : '000000';
 
         const joinNonEmpty = (parts: (string | undefined | null)[], separator: string): string => {
             return parts.filter(p => p && p.trim()).join(separator);
@@ -405,8 +416,8 @@ const App: React.FC = () => {
             }],
         });
     
-        docx.Packer.toBlob(doc).then(blob => {
-            saveAs(blob, `resume-${template}.docx`);
+        docx.Packer.toBlob(doc).then((blob: Blob) => {
+            window.saveAs(blob, `resume-${template}.docx`);
         });
     };
 
@@ -414,6 +425,7 @@ const App: React.FC = () => {
         setIsParsing(true);
         setParsingError(null);
         setOriginalResumeText(text);
+        setParseStartTime(Date.now());
         try {
             const parsedData = await parseResumeText(text);
             setResumeData(parsedData);
@@ -422,8 +434,14 @@ const App: React.FC = () => {
             setResumeData(null); // Clear data on error
         } finally {
             setIsParsing(false);
+            setParseStartTime(null);
         }
     };
+
+    const isAnyLoading = useMemo(
+        () => isParsing || isImproving,
+        [isParsing, isImproving]
+    );
 
     return (
         <div className="min-h-screen bg-gray-100">
@@ -456,9 +474,12 @@ const App: React.FC = () => {
                         <div className="bg-white p-8 rounded-xl shadow-lg text-center">
                              <h2 className="text-2xl font-bold text-gray-800">Welcome!</h2>
                              <p className="mt-2 text-gray-600">Start by uploading your resume. The AI will automatically parse it and generate a professional preview for you to customize.</p>
-                             <div className="mt-6">
+                             <p className="text-sm text-gray-500">
+                                {elapsedSeconds > 0 ? `Processing... ${elapsedSeconds}s` : 'Typically takes 3-8 seconds...'}
+                            </p>
+                            <div className="mt-6">
                                 <PdfUploader onParse={handleResumeParse} isParsing={isParsing} />
-                             </div>
+                            </div>
                             {parsingError && <div className="p-4 mt-4 bg-red-100 text-red-700 rounded-md text-sm text-left">{parsingError}</div>}
                         </div>
                     </div>
@@ -485,8 +506,6 @@ const App: React.FC = () => {
                                 {parsingError && <div className="p-4 bg-red-100 text-red-700 rounded-md text-sm">{parsingError}</div>}
                                 {originalResumeText && <OriginalResumeViewer text={originalResumeText} />}
                                 <TemplateSelector selectedTemplate={template} onSelectTemplate={handleSelectTemplate} />
-                                <CustomizationPanel onCustomize={handleStyleCustomize} isLoading={isStyling} />
-                                {styleError && <div className="p-4 bg-red-100 text-red-700 rounded-md text-sm">{styleError}</div>}
                                 <ContentImprover onImprove={handleImproveContent} isLoading={isImproving} />
                                 {improvingError && <div className="p-4 bg-red-100 text-red-700 rounded-md text-sm">{improvingError}</div>}
                             </div>

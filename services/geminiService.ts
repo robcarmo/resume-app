@@ -1,7 +1,88 @@
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import type { ResumeData, CustomStyles } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize with Gemini API key
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
+// Retry configuration
+interface RetryConfig {
+    maxRetries: number;
+    initialDelayMs: number;
+    maxDelayMs: number;
+    backoffMultiplier: number;
+}
+
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
+    maxRetries: 3,
+    initialDelayMs: 1000,
+    maxDelayMs: 10000,
+    backoffMultiplier: 2,
+};
+
+// Utility function to sleep for a specified duration
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+// Retry wrapper with exponential backoff
+async function retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    config: RetryConfig = DEFAULT_RETRY_CONFIG
+): Promise<T> {
+    let lastError: Error | unknown;
+    let delayMs = config.initialDelayMs;
+
+    for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error;
+            
+            // Don't retry on final attempt
+            if (attempt === config.maxRetries) {
+                break;
+            }
+
+            // Check if error is retryable (network errors, rate limits, temporary failures)
+            const isRetryable = isRetryableError(error);
+            if (!isRetryable) {
+                // If error is not retryable (e.g., authentication, invalid input), fail immediately
+                throw error;
+            }
+
+            console.warn(`API call failed (attempt ${attempt + 1}/${config.maxRetries + 1}), retrying in ${delayMs}ms...`, error);
+            
+            await sleep(delayMs);
+            
+            // Exponential backoff with max delay cap
+            delayMs = Math.min(delayMs * config.backoffMultiplier, config.maxDelayMs);
+        }
+    }
+
+    throw lastError;
+}
+
+// Determine if an error is retryable
+function isRetryableError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
+
+    const errorMessage = 'message' in error ? String(error.message).toLowerCase() : '';
+    
+    // Retry on network errors, rate limits, and temporary failures
+    const retryablePatterns = [
+        'network',
+        'timeout',
+        'econnreset',
+        'enotfound',
+        'rate limit',
+        'too many requests',
+        'service unavailable',
+        '503',
+        '429',
+        'temporarily unavailable',
+    ];
+
+    return retryablePatterns.some(pattern => errorMessage.includes(pattern));
+}
 
 const styleSchema = {
     type: Type.OBJECT,
@@ -138,22 +219,27 @@ const normalizeResumeData = (data: Partial<ResumeData>): ResumeData => {
 export const parseResumeText = async (resumeText: string): Promise<ResumeData> => {
     let response: GenerateContentResponse | undefined;
     try {
-        // Refined and simplified prompt for better consistency
-        const prompt = `
-You are an expert resume parser. Your task is to extract information from the provided resume text and structure it into a JSON object that strictly conforms to the provided schema.
+        // Robust, concise mapping of many real-world section title variants (case-insensitive)
+        const prompt = `Extract resume information into JSON using the provided schema. Standardize section headers to these targets:
 
-**Key Instructions:**
-1.  **Schema Adherence**: Strictly follow the provided JSON schema. Return ALL fields defined in the schema, using \`[]\` for empty arrays and \`""\` for empty strings.
-2.  **ID Generation**: For all items in arrays (e.g., experience, education), generate a unique string ID (like "exp1", "edu1").
-3.  **Skills**: The 'years' property for each skill MUST be \`0\`.
-4.  **Intelligent Mapping**: Intelligently map common resume section headers (e.g., "Work History") to the correct schema fields (e.g., "experience").
-5.  **Clean Output**: Your final output must be ONLY the raw JSON object, with no surrounding text, explanations, or markdown formatting.
+- experience: Professional Experience, Work Experience, Employment History, Work History, Career History, Roles, Positions, Experience, PROFESSIONAL EXPERIENCE
+- education: Education, Academic Background, Educational Background, Academic Qualifications, Qualifications, EDUCATION
+- certifications: Certifications, Certification, Certificates, Licenses, Professional Certifications, Credentials, CERTIFICATIONS
+- skills: Skills, Technical Skills, Core Competencies, Competencies, Tech Stack, Technologies, Tools, Programming Languages, SKILLS, Technical Summary
+- projects: Projects, Selected Projects, Key Projects, Notable Projects, Portfolio, Case Studies, PROJECTS, SELECTED PROJECTS
+- personalInfo.summary: Summary, Professional Summary, Profile, About, About Me, Overview, Objective, Career Objective, Highlights, SUMMARY
 
-**Raw Resume Text:**
----
-${resumeText}
----
-`;
+Rules:
+1) Case-insensitive header matching; headers may be uppercase, include punctuation (e.g., ":"), or small variants (e.g., "Selected Projects").
+2) Generate stable IDs (exp1, exp2, edu1, proj1, skill1...).
+3) Skills.years: extract from text if present (e.g., "Python (5 years)", "React - 3 yrs", "JavaScript: 7 years"); default to 0 if not stated.
+4) Use context (dates, company/institution names, degrees) to place content in correct section.
+5) Ignore sections not in schema (e.g., Awards, Publications) unless their content clearly belongs to an existing section.
+6) Return only valid JSON for the full schema. Use [] for missing arrays and "" for empty strings.
+
+Resume:
+${resumeText}`;
+        // Direct API call for faster parsing (no retry)
         response = await ai.models.generateContent({
             model: "gemini-2.5-pro",
             contents: prompt,
@@ -210,41 +296,52 @@ export const improveResumeContent = async (resumeData: ResumeData, prompt: strin
         // Create a deep copy to ensure we're working with fresh data
         const currentData = JSON.parse(JSON.stringify(resumeData));
         
-        const fullPrompt = `
-You are an expert resume writer and career coach. Your task is to revise the provided resume content in JSON format based on the user's request.
+        const fullPrompt = `You are an expert resume writer. Revise the resume JSON based on the user's request.
 
-**Core Task:**
-Analyze the user's request and intelligently update the provided JSON object of resume data. Your revisions should be professional and aimed at making the resume more effective.
+**YOUR TASK:**
+Analyze the user's request and apply changes to ALL relevant sections. If the request mentions "entire resume", "all sections", or general improvements, update ALL applicable fields (summary, experience descriptions, skills, etc.).
 
-**CRITICAL RULES - DATA PRESERVATION:**
-1.  **NEVER REMOVE OR DELETE ANY EXISTING INFORMATION**: You must preserve ALL existing data including job titles, company names, dates, skills, education details, certifications, and project information.
-2.  **NEVER LEAVE ANY SECTION EMPTY**: If a section had content before, it must have content after. Do not remove or empty any arrays or strings that previously contained data.
-3.  **PRESERVE ALL IDs**: Do not change the 'id' fields for any items in arrays (experience, education, etc.).
-4.  **MAINTAIN FACTUAL ACCURACY**: Keep all factual information (dates, company names, job titles, degree names, etc.) exactly as provided.
-5.  **COMPLETE JSON OBJECT**: Return the complete, valid JSON object that conforms to the provided schema with ALL original keys and data structures.
+**CRITICAL - DATA PRESERVATION:**
+1. NEVER remove sections, jobs, education, skills, or certifications
+2. PRESERVE all dates, company names, job titles, degrees, and IDs
+3. Keep ALL array items - if experience has 3 jobs, output must have 3 jobs
+4. NEVER empty any section that had content
+5. Return COMPLETE JSON with all original structure
 
-**ENHANCEMENT GUIDELINES:**
-- Only enhance, refine, and improve existing content
-- Improve language clarity and professional tone
-- Strengthen action verbs and impact statements
-- Refine descriptions while maintaining all technical details
-- Ensure consistent formatting
-- If the request is unclear or cannot be reasonably addressed, return the data completely unmodified
+**WHEN SHORTENING/CONDENSING:**
+- Apply to ALL text fields: summary, experience descriptions, project descriptions
+- Make bullet points concise but keep ALL of them
+- Use stronger action verbs to reduce word count
+- Remove filler words but keep key accomplishments
+- Keep all technical terms, metrics, and achievements
+- Preserve section structure (if 5 bullet points, keep 5 bullet points)
 
-**INPUTS:**
+**WHEN IMPROVING ACTION VERBS:**
+- Update verbs in experience.description arrays
+- Strengthen language throughout all job descriptions
+- Apply consistently across ALL experience items
 
-**1. User's Request:**
+**WHEN IMPROVING OVERALL:**
+- Update summary for impact
+- Enhance ALL experience descriptions
+- Improve ALL project descriptions
+- Make changes across the entire resume, not just one section
+
+**ENHANCEMENT RULES:**
+- ACTUALLY MAKE CHANGES - don't be too conservative
+- Apply requested improvements to ALL relevant fields
+- Improve clarity and impact across all sections
+- Strengthen language without changing facts
+- Maintain professional tone
+- Keep all technical details
+
+**User Request:**
 "${prompt}"
 
-**2. Current Resume Data (JSON object):**
+**Current Resume (JSON):**
 ${JSON.stringify(currentData, null, 2)}
 
-**EXAMPLE:**
--   **User Request**: "Rewrite my summary to be more impactful for a senior software engineer role."
--   **Action**: You would enhance the 'summary' string within the 'personalInfo' object while keeping all other data exactly the same, and return the entire, updated JSON object.
-
-Now, based on the user's request, provide the updated and complete JSON object with ALL original data preserved and enhanced.
-`;
+**Output:** Return the complete, improved JSON with changes applied to ALL relevant sections.`;
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-pro",
