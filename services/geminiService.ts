@@ -298,55 +298,44 @@ export const improveResumeContent = async (resumeData: ResumeData, prompt: strin
         
         const fullPrompt = `You are an expert resume writer. Revise the resume JSON based on the user's request.
 
-**CRITICAL INSTRUCTION - READ CAREFULLY:**
-The user's request applies to THE ENTIRE RESUME unless they specifically mention only one section (like "only the summary" or "just the first job"). 
+**SCOPE OF CHANGES - CRITICAL:**
+Apply improvements ONLY to these two sections:
+1. personalInfo.summary (Professional Summary)
+2. experience[].description (Work Experience bullet points)
 
-**DEFAULT BEHAVIOR:**
-- If the request says "improve", "make better", "enhance", "shorten", "condense", "rewrite", etc. WITHOUT specifying a single section → Apply to ALL sections
-- If the request mentions "action verbs", "stronger language", "more concise" → Apply to ALL experience descriptions, ALL project descriptions, AND the summary
-- If the request is about tone, style, or general improvement → Apply EVERYWHERE
+**DO NOT MODIFY:**
+- Projects, keyArchitecturalProjects, education, skills, certifications
+- Job titles, company names, dates, locations, names, emails, phone numbers
+- Any IDs or structural elements
 
-**SPECIFIC SECTION TARGETING:**
-Only limit changes to one section if the user explicitly says:
-- "only the summary"
-- "just the professional summary"
-- "only the first job"
-- "just the education section"
+**WHAT TO IMPROVE:**
 
-**MANDATORY CHANGES - YOU MUST MODIFY:**
-1. personalInfo.summary - ALWAYS improve this unless user says "don't change summary"
-2. ALL experience[].description arrays - Update EVERY bullet point in EVERY job
-3. ALL projects[].description - Improve EVERY project description
-4. ALL keyArchitecturalProjects[].description - Improve EVERY project description
+For personalInfo.summary:
+- Strengthen opening statement
+- Use powerful action verbs
+- Highlight key achievements and expertise
+- Make it concise and impactful
+- Keep it professional and focused
 
-**DATA PRESERVATION (DO NOT CHANGE):**
-- Dates (startDate, endDate, gradDate)
-- Names (company, institution, jobTitle, degree, name, email, phone, location, website)
-- IDs (exp1, edu1, etc.)
-- Array lengths (if 3 jobs exist, return 3 jobs)
-- Links and URLs
-- Certifications and skills lists
-
-**EXAMPLES OF WHAT TO CHANGE:**
-
-User says: "Make it more concise"
-→ Shorten summary, shorten ALL experience descriptions, shorten ALL project descriptions
-
-User says: "Improve action verbs"
-→ Replace weak verbs with strong verbs in summary, ALL experience descriptions, ALL project descriptions
-
-User says: "Make it more impactful"
-→ Strengthen language in summary, ALL experience descriptions, ALL project descriptions
-
-User says: "Rewrite to be better"
-→ Improve summary, ALL experience descriptions, ALL project descriptions
-
-**WHAT YOU MUST ACTUALLY CHANGE:**
-- Replace weak verbs (managed, worked on, helped with) with strong verbs (orchestrated, architected, spearheaded)
+For experience[].description arrays:
+- Replace weak verbs (managed, worked on, helped) with strong verbs (led, architected, spearheaded, drove, optimized)
 - Remove filler words (very, really, basically, essentially)
-- Add metrics where implied (e.g., "improved performance" → "improved performance by optimizing algorithms")
-- Make passive voice active (e.g., "was responsible for" → "led")
-- Condense wordy phrases (e.g., "in order to" → "to", "due to the fact that" → "because")
+- Make passive voice active ("was responsible for" → "led")
+- Add impact where appropriate
+- Keep all bullet points (don't remove any)
+- Maintain technical accuracy
+- Preserve metrics and numbers
+
+**EXAMPLES:**
+
+Before: "Managed a team of developers"
+After: "Led a cross-functional team of 5 developers"
+
+Before: "Worked on improving system performance"
+After: "Optimized system performance, reducing load time by 40%"
+
+Before: "Was responsible for database design"
+After: "Architected scalable database solutions"
 
 **User Request:**
 "${prompt}"
@@ -354,7 +343,7 @@ User says: "Rewrite to be better"
 **Current Resume (JSON):**
 ${JSON.stringify(currentData, null, 2)}
 
-**REMINDER:** Unless the user explicitly limited the request to ONE section, you MUST modify the summary, ALL experience descriptions, and ALL project descriptions. Return the complete JSON with visible improvements throughout.`;
+**IMPORTANT:** Return the complete JSON. Only modify personalInfo.summary and experience[].description arrays. Keep everything else exactly as is.`;
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-pro",
