@@ -8,6 +8,8 @@ import { DownloadIcon, DocumentArrowDownIcon } from './components/icons';
 import OriginalResumeViewer from './components/OriginalResumeViewer';
 import ContentImprover from './components/ContentImprover';
 
+type WorkflowStep = 'upload' | 'improve' | 'format';
+
 const professionalStyles: CustomStyles = {
     container: 'font-sans text-gray-900 leading-normal',
     header: 'border-b-2 border-blue-700 pb-2 mb-4',
@@ -50,6 +52,8 @@ const initialStyles: Record<Template, CustomStyles> = {
 };
 
 const App: React.FC = () => {
+    const [currentStep, setCurrentStep] = useState<WorkflowStep>('upload');
+    const [rawResumeData, setRawResumeData] = useState<any>(null);
     const [resumeData, setResumeData] = useState<ResumeData | null>(null);
     const [template, setTemplate] = useState<Template>('professional');
     const [customStyles, setCustomStyles] = useState<CustomStyles>(initialStyles.professional);
@@ -81,6 +85,19 @@ const App: React.FC = () => {
         setTemplate(selectedTemplate);
         setCustomStyles(initialStyles[selectedTemplate]);
     }, []);
+
+    const handleProceedToFormat = () => {
+        setCurrentStep('format');
+    };
+
+    const handleStartOver = () => {
+        setCurrentStep('upload');
+        setRawResumeData(null);
+        setResumeData(null);
+        setOriginalResumeText(null);
+        setParsingError(null);
+        setImprovingError(null);
+    };
 
     const handleImproveContent = async (prompt: string) => {
         if (!resumeData) return;
@@ -428,7 +445,9 @@ const App: React.FC = () => {
         setParseStartTime(Date.now());
         try {
             const parsedData = await parseResumeText(text);
+            setRawResumeData(parsedData);
             setResumeData(parsedData);
+            setCurrentStep('improve');
         } catch (err) {
             setParsingError(err instanceof Error ? err.message : 'An unknown error occurred during parsing.');
             setResumeData(null); // Clear data on error
@@ -444,78 +463,150 @@ const App: React.FC = () => {
     );
 
     return (
-        <div className="min-h-screen bg-gray-100">
-            <header className="bg-white shadow-sm sticky top-0 z-10">
-                <div className="max-w-screen-2xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                    <h1 className="text-2xl font-bold text-gray-900">AI Resume Formatter</h1>
-                    {resumeData && (
-                        <div className="flex space-x-2">
-                            <button
-                                onClick={handleDownloadDocx}
-                                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                                <DocumentArrowDownIcon className="w-5 h-5 mr-2" />
-                                Download DOCX
-                            </button>
-                            <button
-                                onClick={handleDownloadPdf}
-                                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                            >
-                                <DownloadIcon className="w-5 h-5 mr-2" />
-                                Download PDF
-                            </button>
+        <div className="min-h-screen bg-gray-50">
+            {/* Header with step indicators */}
+            <header className="bg-white shadow-sm border-b">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-2xl font-bold text-gray-900">Resume Builder</h1>
+                        <div className="flex items-center space-x-4">
+                            <div className={`flex items-center ${currentStep === 'upload' ? 'text-blue-600' : currentStep === 'improve' || currentStep === 'format' ? 'text-green-600' : 'text-gray-400'}`}>
+                                <span className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium mr-2">1</span>
+                                Upload
+                            </div>
+                            <div className={`flex items-center ${currentStep === 'improve' ? 'text-blue-600' : currentStep === 'format' ? 'text-green-600' : 'text-gray-400'}`}>
+                                <span className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium mr-2">2</span>
+                                Improve
+                            </div>
+                            <div className={`flex items-center ${currentStep === 'format' ? 'text-blue-600' : 'text-gray-400'}`}>
+                                <span className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium mr-2">3</span>
+                                Format
+                            </div>
                         </div>
-                    )}
+                        {currentStep === 'format' && resumeData && (
+                            <div className="flex space-x-2">
+                                <button
+                                    onClick={handleDownloadDocx}
+                                    className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                    <DocumentArrowDownIcon className="w-5 h-5 mr-2" />
+                                    Download DOCX
+                                </button>
+                                <button
+                                    onClick={handleDownloadPdf}
+                                    className="flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                >
+                                    <DownloadIcon className="w-5 h-5 mr-2" />
+                                    Download PDF
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </header>
-            <main className="max-w-screen-2xl mx-auto py-6 sm:px-6 lg:px-8">
-               {!resumeData && !isParsing && (
-                    <div className="max-w-2xl mx-auto py-12 px-4">
-                        <div className="bg-white p-8 rounded-xl shadow-lg text-center">
-                             <h2 className="text-2xl font-bold text-gray-800">Welcome!</h2>
-                             <p className="mt-2 text-gray-600">Start by uploading your resume. The AI will automatically parse it and generate a professional preview for you to customize.</p>
-                             <p className="text-sm text-gray-500">
-                                {elapsedSeconds > 0 ? `Processing... ${elapsedSeconds}s` : 'Typically takes 3-8 seconds...'}
-                            </p>
-                            <div className="mt-6">
-                                <PdfUploader onParse={handleResumeParse} isParsing={isParsing} />
+
+            {/* Step 1: Upload */}
+            {currentStep === 'upload' && (
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="text-center mb-8">
+                        <h2 className="text-3xl font-bold text-gray-900 mb-4">Upload Your Resume</h2>
+                        <p className="text-lg text-gray-600">Upload your resume to get started with AI-powered improvements</p>
+                        {isParsing && (
+                            <div className="mt-4">
+                                <div className="flex justify-center items-center">
+                                    <svg className="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                </div>
+                                <p className="mt-2 text-sm text-gray-500">
+                                    {elapsedSeconds > 0 ? `Processing... ${elapsedSeconds}s` : 'Parsing your resume with AI...'}
+                                </p>
                             </div>
-                            {parsingError && <div className="p-4 mt-4 bg-red-100 text-red-700 rounded-md text-sm text-left">{parsingError}</div>}
+                        )}
+                    </div>
+                    {!isParsing && <PdfUploader onParse={handleResumeParse} isParsing={isParsing} />}
+                    {parsingError && <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-md text-sm">{parsingError}</div>}
+                </div>
+            )}
+
+            {/* Step 2: AI Content Improvement */}
+            {currentStep === 'improve' && resumeData && (
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="text-center mb-8">
+                        <h2 className="text-3xl font-bold text-gray-900 mb-4">AI Content Improvement</h2>
+                        <p className="text-lg text-gray-600">Let AI enhance your resume content before formatting</p>
+                    </div>
+                    
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                        <h3 className="font-semibold text-blue-900 mb-2">💡 Tips for AI Improvement:</h3>
+                        <ul className="text-blue-800 text-sm space-y-1">
+                            <li>• AI will enhance your professional summary and experience sections</li>
+                            <li>• Content improvements happen on raw data before any formatting</li>
+                            <li>• Use specific prompts like "make it more professional" or "add action verbs"</li>
+                        </ul>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div>
+                            <ContentImprover onImprove={handleImproveContent} isLoading={isImproving} />
+                            {improvingError && <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-md text-sm">{improvingError}</div>}
+                        </div>
+                        <div>
+                            {originalResumeText && <OriginalResumeViewer text={originalResumeText} />}
                         </div>
                     </div>
-                )}
 
-                {isParsing && (
-                    <div className="flex justify-center items-center h-[calc(100vh-150px)]">
-                         <div className="flex flex-col items-center justify-center text-center">
-                            <svg className="animate-spin h-12 w-12 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <p className="mt-4 text-lg font-semibold text-indigo-700">Parsing your resume with AI...</p>
-                            <p className="text-sm text-gray-500">This might take a moment.</p>
-                        </div>
+                    <div className="flex justify-between mt-8">
+                        <button
+                            onClick={handleStartOver}
+                            className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                        >
+                            ← Start Over
+                        </button>
+                        <button
+                            onClick={handleProceedToFormat}
+                            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        >
+                            Proceed to Format →
+                        </button>
                     </div>
-                )}
+                </div>
+            )}
 
-                {resumeData && (
-                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div className="h-[calc(100vh-100px)] overflow-y-auto pr-4">
-                            <div className="space-y-6">
-                                <PdfUploader onParse={handleResumeParse} isParsing={isParsing} />
-                                {parsingError && <div className="p-4 bg-red-100 text-red-700 rounded-md text-sm">{parsingError}</div>}
-                                {originalResumeText && <OriginalResumeViewer text={originalResumeText} />}
-                                <TemplateSelector selectedTemplate={template} onSelectTemplate={handleSelectTemplate} />
-                                <ContentImprover onImprove={handleImproveContent} isLoading={isImproving} />
-                                {improvingError && <div className="p-4 bg-red-100 text-red-700 rounded-md text-sm">{improvingError}</div>}
-                            </div>
+            {/* Step 3: Format & Download */}
+            {currentStep === 'format' && resumeData && (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="text-center mb-8">
+                        <h2 className="text-3xl font-bold text-gray-900 mb-4">Format & Download</h2>
+                        <p className="text-lg text-gray-600">Choose your template and download your improved resume</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-1 space-y-6">
+                            <TemplateSelector selectedTemplate={template} onSelectTemplate={handleSelectTemplate} />
                         </div>
-                        <div className="h-[calc(100vh-100px)] overflow-y-auto bg-gray-200 p-4 rounded-lg">
+                        <div className="lg:col-span-2">
                             <ResumePreview resumeRef={resumeRef} resumeData={resumeData} styles={customStyles} />
                         </div>
                     </div>
-                )}
-            </main>
+
+                    <div className="flex justify-between mt-8">
+                        <button
+                            onClick={() => setCurrentStep('improve')}
+                            className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                        >
+                            ← Back to Improve
+                        </button>
+                        <button
+                            onClick={handleStartOver}
+                            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                        >
+                            Start New Resume
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
