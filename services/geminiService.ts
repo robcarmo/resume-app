@@ -298,42 +298,55 @@ export const improveResumeContent = async (resumeData: ResumeData, prompt: strin
         
         const fullPrompt = `You are an expert resume writer. Revise the resume JSON based on the user's request.
 
-**YOUR TASK:**
-Analyze the user's request and apply changes to ALL relevant sections. If the request mentions "entire resume", "all sections", or general improvements, update ALL applicable fields (summary, experience descriptions, skills, etc.).
+**CRITICAL INSTRUCTION - READ CAREFULLY:**
+The user's request applies to THE ENTIRE RESUME unless they specifically mention only one section (like "only the summary" or "just the first job"). 
 
-**CRITICAL - DATA PRESERVATION:**
-1. NEVER remove sections, jobs, education, skills, or certifications
-2. PRESERVE all dates, company names, job titles, degrees, and IDs
-3. Keep ALL array items - if experience has 3 jobs, output must have 3 jobs
-4. NEVER empty any section that had content
-5. Return COMPLETE JSON with all original structure
+**DEFAULT BEHAVIOR:**
+- If the request says "improve", "make better", "enhance", "shorten", "condense", "rewrite", etc. WITHOUT specifying a single section → Apply to ALL sections
+- If the request mentions "action verbs", "stronger language", "more concise" → Apply to ALL experience descriptions, ALL project descriptions, AND the summary
+- If the request is about tone, style, or general improvement → Apply EVERYWHERE
 
-**WHEN SHORTENING/CONDENSING:**
-- Apply to ALL text fields: summary, experience descriptions, project descriptions
-- Make bullet points concise but keep ALL of them
-- Use stronger action verbs to reduce word count
-- Remove filler words but keep key accomplishments
-- Keep all technical terms, metrics, and achievements
-- Preserve section structure (if 5 bullet points, keep 5 bullet points)
+**SPECIFIC SECTION TARGETING:**
+Only limit changes to one section if the user explicitly says:
+- "only the summary"
+- "just the professional summary"
+- "only the first job"
+- "just the education section"
 
-**WHEN IMPROVING ACTION VERBS:**
-- Update verbs in experience.description arrays
-- Strengthen language throughout all job descriptions
-- Apply consistently across ALL experience items
+**MANDATORY CHANGES - YOU MUST MODIFY:**
+1. personalInfo.summary - ALWAYS improve this unless user says "don't change summary"
+2. ALL experience[].description arrays - Update EVERY bullet point in EVERY job
+3. ALL projects[].description - Improve EVERY project description
+4. ALL keyArchitecturalProjects[].description - Improve EVERY project description
 
-**WHEN IMPROVING OVERALL:**
-- Update summary for impact
-- Enhance ALL experience descriptions
-- Improve ALL project descriptions
-- Make changes across the entire resume, not just one section
+**DATA PRESERVATION (DO NOT CHANGE):**
+- Dates (startDate, endDate, gradDate)
+- Names (company, institution, jobTitle, degree, name, email, phone, location, website)
+- IDs (exp1, edu1, etc.)
+- Array lengths (if 3 jobs exist, return 3 jobs)
+- Links and URLs
+- Certifications and skills lists
 
-**ENHANCEMENT RULES:**
-- ACTUALLY MAKE CHANGES - don't be too conservative
-- Apply requested improvements to ALL relevant fields
-- Improve clarity and impact across all sections
-- Strengthen language without changing facts
-- Maintain professional tone
-- Keep all technical details
+**EXAMPLES OF WHAT TO CHANGE:**
+
+User says: "Make it more concise"
+→ Shorten summary, shorten ALL experience descriptions, shorten ALL project descriptions
+
+User says: "Improve action verbs"
+→ Replace weak verbs with strong verbs in summary, ALL experience descriptions, ALL project descriptions
+
+User says: "Make it more impactful"
+→ Strengthen language in summary, ALL experience descriptions, ALL project descriptions
+
+User says: "Rewrite to be better"
+→ Improve summary, ALL experience descriptions, ALL project descriptions
+
+**WHAT YOU MUST ACTUALLY CHANGE:**
+- Replace weak verbs (managed, worked on, helped with) with strong verbs (orchestrated, architected, spearheaded)
+- Remove filler words (very, really, basically, essentially)
+- Add metrics where implied (e.g., "improved performance" → "improved performance by optimizing algorithms")
+- Make passive voice active (e.g., "was responsible for" → "led")
+- Condense wordy phrases (e.g., "in order to" → "to", "due to the fact that" → "because")
 
 **User Request:**
 "${prompt}"
@@ -341,7 +354,7 @@ Analyze the user's request and apply changes to ALL relevant sections. If the re
 **Current Resume (JSON):**
 ${JSON.stringify(currentData, null, 2)}
 
-**Output:** Return the complete, improved JSON with changes applied to ALL relevant sections.`;
+**REMINDER:** Unless the user explicitly limited the request to ONE section, you MUST modify the summary, ALL experience descriptions, and ALL project descriptions. Return the complete JSON with visible improvements throughout.`;
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-pro",
