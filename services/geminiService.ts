@@ -296,54 +296,69 @@ export const improveResumeContent = async (resumeData: ResumeData, prompt: strin
         // Create a deep copy to ensure we're working with fresh data
         const currentData = JSON.parse(JSON.stringify(resumeData));
         
-        const fullPrompt = `You are an expert resume writer. Revise the resume JSON based on the user's request.
+        const fullPrompt = `You are an expert resume writer. Analyze the user's request and apply appropriate changes to the resume JSON.
 
-**SCOPE OF CHANGES - CRITICAL:**
-Apply improvements ONLY to these two sections:
-1. personalInfo.summary (Professional Summary)
-2. experience[].description (Work Experience bullet points)
+**YOUR TASK:**
+Read the user's request carefully and determine which sections they want to improve. Apply changes ONLY to the sections they mention or imply.
 
-**DO NOT MODIFY:**
-- Projects, keyArchitecturalProjects, education, skills, certifications
-- Job titles, company names, dates, locations, names, emails, phone numbers
-- Any IDs or structural elements
+**SECTION MAPPING:**
+- "summary", "professional summary", "profile", "about me" → personalInfo.summary
+- "experience", "work experience", "professional experience", "jobs", "work history" → experience[].description
+- "education", "academic background" → education (degree, institution, etc.)
+- "skills", "technical skills" → skills
+- "projects", "personal projects" → projects[].description
+- "certifications", "certificates" → certifications
 
-**WHAT TO IMPROVE:**
+**INTERPRETATION RULES:**
 
-For personalInfo.summary:
-- Strengthen opening statement
-- Use powerful action verbs
-- Highlight key achievements and expertise
-- Make it concise and impactful
-- Keep it professional and focused
+1. **Specific Section Requests:**
+   - "improve the summary" → Only change personalInfo.summary
+   - "improve work experience" → Only change experience[].description arrays
+   - "improve the first job" → Only change experience[0].description
+   - "improve education section" → Only change education items
+   - "improve skills" → Only change skills array
 
-For experience[].description arrays:
-- Replace weak verbs (managed, worked on, helped) with strong verbs (led, architected, spearheaded, drove, optimized)
-- Remove filler words (very, really, basically, essentially)
-- Make passive voice active ("was responsible for" → "led")
-- Add impact where appropriate
-- Keep all bullet points (don't remove any)
-- Maintain technical accuracy
-- Preserve metrics and numbers
+2. **Multiple Section Requests:**
+   - "improve summary and experience" → Change personalInfo.summary AND all experience[].description
+   - "improve experience and projects" → Change experience[].description AND projects[].description
 
-**EXAMPLES:**
+3. **General Improvement Requests:**
+   - "improve the resume", "make it better", "enhance it", "rewrite it" → Change personalInfo.summary AND all experience[].description (most common sections to improve)
+   - "make everything more concise" → Apply to summary, experience, projects, education descriptions
+   - "use stronger action verbs" → Apply to summary and experience descriptions
 
-Before: "Managed a team of developers"
-After: "Led a cross-functional team of 5 developers"
+4. **Specific Content Requests:**
+   - "make it shorter", "condense", "more concise" → Shorten text in relevant sections
+   - "use better action verbs", "stronger language" → Replace weak verbs with strong ones
+   - "add more impact", "more impressive" → Enhance language and add metrics where appropriate
+   - "more technical", "more detailed" → Add technical depth
 
-Before: "Worked on improving system performance"
-After: "Optimized system performance, reducing load time by 40%"
+**WHEN IMPROVING EXPERIENCE:**
+- If you modify experience, improve ALL experience items, not just the first one
+- Improve EVERY bullet point in each experience item
+- Replace weak verbs: managed→led, worked on→engineered, helped→contributed, was responsible for→directed
 
-Before: "Was responsible for database design"
-After: "Architected scalable database solutions"
+**STRICT PRESERVATION:**
+Always preserve:
+- All dates (startDate, endDate, gradDate)
+- All names (name, company, institution, jobTitle, degree)
+- All contact info (email, phone, location, website)
+- All IDs (exp1, edu1, skill1, etc.)
+- Array lengths (if 3 jobs exist, return 3 jobs)
+- Links and URLs
 
-**User Request:**
+**User's Request:**
 "${prompt}"
 
 **Current Resume (JSON):**
 ${JSON.stringify(currentData, null, 2)}
 
-**IMPORTANT:** Return the complete JSON. Only modify personalInfo.summary and experience[].description arrays. Keep everything else exactly as is.`;
+**INSTRUCTIONS:**
+1. Analyze what the user is asking for
+2. Determine which sections to modify
+3. Apply meaningful improvements to those sections
+4. Leave other sections completely unchanged
+5. Return the complete JSON with only the requested sections improved`;
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-pro",
