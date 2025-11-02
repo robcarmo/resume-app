@@ -296,69 +296,70 @@ export const improveResumeContent = async (resumeData: ResumeData, prompt: strin
         // Create a deep copy to ensure we're working with fresh data
         const currentData = JSON.parse(JSON.stringify(resumeData));
         
-        const fullPrompt = `You are an expert resume writer. Analyze the user's request and apply appropriate changes to the resume JSON.
+        // Count experience items for explicit targeting
+        const expCount = currentData.experience?.length || 0;
+        
+        const fullPrompt = `You are an expert resume writer. Revise the resume JSON based on the user's request.
 
 **YOUR TASK:**
-Read the user's request carefully and determine which sections they want to improve. Apply changes ONLY to the sections they mention or imply.
+Analyze the user's request and apply changes to ALL relevant sections. If the request mentions "entire resume", "all sections", or general improvements, update ALL applicable fields (summary, experience descriptions, skills, etc.).
 
-**SECTION MAPPING:**
-- "summary", "professional summary", "profile", "about me" → personalInfo.summary
-- "experience", "work experience", "professional experience", "jobs", "work history" → experience[].description
-- "education", "academic background" → education (degree, institution, etc.)
-- "skills", "technical skills" → skills
-- "projects", "personal projects" → projects[].description
-- "certifications", "certificates" → certifications
+**CRITICAL INSTRUCTIONS:**
+- When improving "professional summary" or "summary": modify the summary section
+- When improving "experience", "professional experience", or "work experience": modify ALL ${expCount} experience items
+- When improving "resume" generally: modify BOTH summary AND all experience items
 
-**INTERPRETATION RULES:**
+**EXPERIENCE MODIFICATION REQUIREMENTS:**
+You MUST modify ALL of these experience items (indices 0 to ${expCount - 1}):
+${currentData.experience?.map((exp, index) => `- Experience item ${index}: ${exp.jobTitle} at ${exp.company}`).join('\n') || ''}
 
-1. **Specific Section Requests:**
-   - "improve the summary" → Only change personalInfo.summary
-   - "improve work experience" → Only change experience[].description arrays
-   - "improve the first job" → Only change experience[0].description
-   - "improve education section" → Only change education items
-   - "improve skills" → Only change skills array
+**BEFORE/AFTER EXAMPLE:**
+Before: "Responsible for managing team"
+After: "Led cross-functional team of 8 engineers, driving 25% improvement in delivery timelines"
 
-2. **Multiple Section Requests:**
-   - "improve summary and experience" → Change personalInfo.summary AND all experience[].description
-   - "improve experience and projects" → Change experience[].description AND projects[].description
+**CRITICAL - DATA PRESERVATION:**
+1. NEVER remove sections, jobs, education, skills, or certifications
+2. PRESERVE all dates, company names, job titles, degrees, and IDs
+3. Keep ALL array items - if experience has 3 jobs, output must have 3 jobs
+4. NEVER empty any section that had content
+5. Return COMPLETE JSON with all original structure
 
-3. **General Improvement Requests:**
-   - "improve the resume", "make it better", "enhance it", "rewrite it" → Change personalInfo.summary AND all experience[].description (most common sections to improve)
-   - "make everything more concise" → Apply to summary, experience, projects, education descriptions
-   - "use stronger action verbs" → Apply to summary and experience descriptions
+**WHEN SHORTENING/CONDENSING:**
+- Apply to ALL text fields: summary, experience descriptions, project descriptions
+- Make bullet points concise but keep ALL of them
+- Use stronger action verbs to reduce word count
+- Remove filler words but keep key accomplishments
+- Keep all technical terms, metrics, and achievements
+- Preserve section structure (if 5 bullet points, keep 5 bullet points)
 
-4. **Specific Content Requests:**
-   - "make it shorter", "condense", "more concise" → Shorten text in relevant sections
-   - "use better action verbs", "stronger language" → Replace weak verbs with strong ones
-   - "add more impact", "more impressive" → Enhance language and add metrics where appropriate
-   - "more technical", "more detailed" → Add technical depth
+**WHEN IMPROVING ACTION VERBS:**
+- Update verbs in experience.description arrays
+- Strengthen language throughout all job descriptions
+- Apply consistently across ALL experience items
 
-**WHEN IMPROVING EXPERIENCE:**
-- If you modify experience, improve ALL experience items, not just the first one
-- Improve EVERY bullet point in each experience item
-- Replace weak verbs: managed→led, worked on→engineered, helped→contributed, was responsible for→directed
+**WHEN IMPROVING OVERALL:**
+- Update summary for impact
+- Enhance ALL experience descriptions
+- Improve ALL project descriptions
+- Make changes across the entire resume, not just one section
 
-**STRICT PRESERVATION:**
-Always preserve:
-- All dates (startDate, endDate, gradDate)
-- All names (name, company, institution, jobTitle, degree)
-- All contact info (email, phone, location, website)
-- All IDs (exp1, edu1, skill1, etc.)
-- Array lengths (if 3 jobs exist, return 3 jobs)
-- Links and URLs
+**ENHANCEMENT RULES:**
+- ACTUALLY MAKE CHANGES - don't be too conservative
+- Apply requested improvements to ALL relevant fields
+- Improve clarity and impact across all sections
+- Strengthen language without changing facts
+- Maintain professional tone
+- Keep all technical details
 
-**User's Request:**
+**FINAL CHECK:** Before returning, verify you modified ALL requested sections and ALL experience items.
+
+**User Request:**
 "${prompt}"
 
 **Current Resume (JSON):**
 ${JSON.stringify(currentData, null, 2)}
 
-**INSTRUCTIONS:**
-1. Analyze what the user is asking for
-2. Determine which sections to modify
-3. Apply meaningful improvements to those sections
-4. Leave other sections completely unchanged
-5. Return the complete JSON with only the requested sections improved`;
+**Output:** Return the complete, improved JSON with changes applied to ALL relevant sections.`;
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-pro",
