@@ -4,7 +4,7 @@ import { parseResumeText, improveResumeContent } from './services/geminiService'
 import ResumePreview from './components/ResumePreview';
 import TemplateSelector from './components/TemplateSelector';
 import PdfUploader from './components/PdfUploader';
-import { DownloadIcon, DocumentArrowDownIcon } from './components/icons';
+import { DownloadIcon, DocumentArrowDownIcon, ArrowLeftIcon, ArrowRightIcon } from './components/icons';
 import OriginalResumeViewer from './components/OriginalResumeViewer';
 import ContentImprover from './components/ContentImprover';
 
@@ -53,7 +53,6 @@ const initialStyles: Record<Template, CustomStyles> = {
 
 const App: React.FC = () => {
     const [currentStep, setCurrentStep] = useState<WorkflowStep>('upload');
-    const [rawResumeData, setRawResumeData] = useState<any>(null);
     const [resumeData, setResumeData] = useState<ResumeData | null>(null);
     const [template, setTemplate] = useState<Template>('professional');
     const [customStyles, setCustomStyles] = useState<CustomStyles>(initialStyles.professional);
@@ -445,15 +444,40 @@ const App: React.FC = () => {
         setParseStartTime(Date.now());
         try {
             const parsedData = await parseResumeText(text);
-            setRawResumeData(parsedData);
             setResumeData(parsedData);
+            // Auto-advance to improve step after successful parsing
             setCurrentStep('improve');
         } catch (err) {
             setParsingError(err instanceof Error ? err.message : 'An unknown error occurred during parsing.');
-            setResumeData(null); // Clear data on error
+            setResumeData(null);
         } finally {
             setIsParsing(false);
             setParseStartTime(null);
+        }
+    };
+
+    const handleNextStep = () => {
+        if (currentStep === 'upload' && resumeData) {
+            setCurrentStep('improve');
+        } else if (currentStep === 'improve') {
+            setCurrentStep('format');
+        }
+    };
+
+    const handlePrevStep = () => {
+        if (currentStep === 'format') {
+            setCurrentStep('improve');
+        } else if (currentStep === 'improve') {
+            setCurrentStep('upload');
+        }
+    };
+
+    const getStepTitle = (step: WorkflowStep): string => {
+        switch (step) {
+            case 'upload': return 'Upload & Parse Resume';
+            case 'improve': return 'AI Content Improvement';
+            case 'format': return 'Format & Download';
+            default: return '';
         }
     };
 
@@ -463,26 +487,11 @@ const App: React.FC = () => {
     );
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* Header with step indicators */}
-            <header className="bg-white shadow-sm border-b">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                    <div className="flex items-center justify-between">
-                        <h1 className="text-2xl font-bold text-gray-900">Resume Builder</h1>
-                        <div className="flex items-center space-x-4">
-                            <div className={`flex items-center ${currentStep === 'upload' ? 'text-blue-600' : currentStep === 'improve' || currentStep === 'format' ? 'text-green-600' : 'text-gray-400'}`}>
-                                <span className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium mr-2">1</span>
-                                Upload
-                            </div>
-                            <div className={`flex items-center ${currentStep === 'improve' ? 'text-blue-600' : currentStep === 'format' ? 'text-green-600' : 'text-gray-400'}`}>
-                                <span className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium mr-2">2</span>
-                                Improve
-                            </div>
-                            <div className={`flex items-center ${currentStep === 'format' ? 'text-blue-600' : 'text-gray-400'}`}>
-                                <span className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium mr-2">3</span>
-                                Format
-                            </div>
-                        </div>
+        <div className="min-h-screen bg-gray-100">
+            <header className="bg-white shadow-sm sticky top-0 z-10">
+                <div className="max-w-screen-2xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between items-center">
+                        <h1 className="text-2xl font-bold text-gray-900">AI Resume Formatter</h1>
                         {currentStep === 'format' && resumeData && (
                             <div className="flex space-x-2">
                                 <button
@@ -502,111 +511,153 @@ const App: React.FC = () => {
                             </div>
                         )}
                     </div>
+                    
+                    {/* Step Indicators */}
+                    <div className="mt-4 flex items-center justify-center">
+                        <div className="flex items-center space-x-4">
+                            {(['upload', 'improve', 'format'] as WorkflowStep[]).map((step, index) => (
+                                <div key={step} className="flex items-center">
+                                    <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
+                                        currentStep === step 
+                                            ? 'bg-indigo-600 text-white' 
+                                            : resumeData && (step === 'upload' || (step === 'improve' && currentStep === 'format'))
+                                                ? 'bg-green-500 text-white'
+                                                : 'bg-gray-300 text-gray-600'
+                                    }`}>
+                                        {index + 1}
+                                    </div>
+                                    <span className={`ml-2 text-sm font-medium ${
+                                        currentStep === step ? 'text-indigo-600' : 'text-gray-500'
+                                    }`}>
+                                        {getStepTitle(step)}
+                                    </span>
+                                    {index < 2 && (
+                                        <div className={`ml-4 w-8 h-0.5 ${
+                                            resumeData && (currentStep === 'format' || (currentStep === 'improve' && step === 'upload'))
+                                                ? 'bg-green-500'
+                                                : 'bg-gray-300'
+                                        }`} />
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </header>
 
-            {/* Step 1: Upload */}
-            {currentStep === 'upload' && (
-                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    <div className="text-center mb-8">
-                        <h2 className="text-3xl font-bold text-gray-900 mb-4">Upload Your Resume</h2>
-                        <p className="text-lg text-gray-600">Upload your resume to get started with AI-powered improvements</p>
-                        {isParsing && (
-                            <div className="mt-4">
-                                <div className="flex justify-center items-center">
-                                    <svg className="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                </div>
-                                <p className="mt-2 text-sm text-gray-500">
-                                    {elapsedSeconds > 0 ? `Processing... ${elapsedSeconds}s` : 'Parsing your resume with AI...'}
-                                </p>
+            <main className="max-w-screen-2xl mx-auto py-6 sm:px-6 lg:px-8">
+                {/* Step 1: Upload & Parse */}
+                {currentStep === 'upload' && (
+                    <div className="max-w-2xl mx-auto py-12 px-4">
+                        <div className="bg-white p-8 rounded-xl shadow-lg text-center">
+                            <h2 className="text-2xl font-bold text-gray-800">Step 1: Upload Your Resume</h2>
+                            <p className="mt-2 text-gray-600">Upload your resume and let AI extract the content automatically.</p>
+                            <p className="text-sm text-gray-500 mt-1">
+                                {elapsedSeconds > 0 ? `Processing... ${elapsedSeconds}s` : 'Typically takes 3-8 seconds...'}
+                            </p>
+                            <div className="mt-6">
+                                <PdfUploader onParse={handleResumeParse} isParsing={isParsing} />
                             </div>
-                        )}
-                    </div>
-                    {!isParsing && <PdfUploader onParse={handleResumeParse} isParsing={isParsing} />}
-                    {parsingError && <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-md text-sm">{parsingError}</div>}
-                </div>
-            )}
-
-            {/* Step 2: AI Content Improvement */}
-            {currentStep === 'improve' && resumeData && (
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    <div className="text-center mb-8">
-                        <h2 className="text-3xl font-bold text-gray-900 mb-4">AI Content Improvement</h2>
-                        <p className="text-lg text-gray-600">Let AI enhance your resume content before formatting</p>
-                    </div>
-                    
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                        <h3 className="font-semibold text-blue-900 mb-2">💡 Tips for AI Improvement:</h3>
-                        <ul className="text-blue-800 text-sm space-y-1">
-                            <li>• AI will enhance your professional summary and experience sections</li>
-                            <li>• Content improvements happen on raw data before any formatting</li>
-                            <li>• Use specific prompts like "make it more professional" or "add action verbs"</li>
-                        </ul>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div>
-                            <ContentImprover onImprove={handleImproveContent} isLoading={isImproving} />
-                            {improvingError && <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-md text-sm">{improvingError}</div>}
-                        </div>
-                        <div>
+                            {parsingError && <div className="p-4 mt-4 bg-red-100 text-red-700 rounded-md text-sm text-left">{parsingError}</div>}
                             {originalResumeText && <OriginalResumeViewer text={originalResumeText} />}
                         </div>
                     </div>
+                )}
 
-                    <div className="flex justify-between mt-8">
-                        <button
-                            onClick={handleStartOver}
-                            className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                        >
-                            ← Start Over
-                        </button>
-                        <button
-                            onClick={handleProceedToFormat}
-                            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                        >
-                            Proceed to Format →
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Step 3: Format & Download */}
-            {currentStep === 'format' && resumeData && (
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    <div className="text-center mb-8">
-                        <h2 className="text-3xl font-bold text-gray-900 mb-4">Format & Download</h2>
-                        <p className="text-lg text-gray-600">Choose your template and download your improved resume</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-1 space-y-6">
-                            <TemplateSelector selectedTemplate={template} onSelectTemplate={handleSelectTemplate} />
+                {/* Step 2: AI Content Improvement */}
+                {currentStep === 'improve' && resumeData && (
+                    <div className="max-w-4xl mx-auto py-8 px-4">
+                        <div className="bg-white p-8 rounded-xl shadow-lg">
+                            <h2 className="text-2xl font-bold text-gray-800 mb-4">Step 2: AI Content Improvement</h2>
+                            <p className="text-gray-600 mb-6">Use AI to enhance your resume content before formatting. This step is optional but recommended.</p>
+                            
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <div className="space-y-6">
+                                    <ContentImprover onImprove={handleImproveContent} isLoading={isImproving} />
+                                    {improvingError && <div className="p-4 bg-red-100 text-red-700 rounded-md text-sm">{improvingError}</div>}
+                                    
+                                    {/* Tips */}
+                                    <div className="bg-blue-50 p-4 rounded-lg">
+                                        <h3 className="font-semibold text-blue-800 mb-2">💡 Improvement Tips:</h3>
+                                        <ul className="text-sm text-blue-700 space-y-1">
+                                            <li>• "Make all descriptions more concise and impactful"</li>
+                                            <li>• "Strengthen action verbs throughout the resume"</li>
+                                            <li>• "Improve the professional summary"</li>
+                                            <li>• "Make bullet points more achievement-focused"</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto">
+                                    <h3 className="font-semibold text-gray-800 mb-3">Current Resume Content:</h3>
+                                    <div className="text-sm text-gray-700 space-y-2">
+                                        <div><strong>Name:</strong> {resumeData.personalInfo.name}</div>
+                                        <div><strong>Summary:</strong> {resumeData.personalInfo.summary?.substring(0, 200)}...</div>
+                                        <div><strong>Experience:</strong> {resumeData.experience.length} positions</div>
+                                        <div><strong>Skills:</strong> {resumeData.skills.length} skills</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="flex justify-between mt-8">
+                                <button
+                                    onClick={handlePrevStep}
+                                    className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                                >
+                                    <ArrowLeftIcon className="w-4 h-4 mr-2" />
+                                    Back to Upload
+                                </button>
+                                <button
+                                    onClick={handleNextStep}
+                                    className="flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                >
+                                    Continue to Format
+                                    <ArrowRightIcon className="w-4 h-4 ml-2" />
+                                </button>
+                            </div>
                         </div>
-                        <div className="lg:col-span-2">
+                    </div>
+                )}
+
+                {/* Step 3: Format & Download */}
+                {currentStep === 'format' && resumeData && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="h-[calc(100vh-200px)] overflow-y-auto pr-4">
+                            <div className="space-y-6">
+                                <div className="bg-white p-6 rounded-lg shadow-sm">
+                                    <h2 className="text-xl font-bold text-gray-800 mb-4">Step 3: Format & Download</h2>
+                                    <p className="text-gray-600 mb-4">Choose a template and customize the formatting.</p>
+                                    <button
+                                        onClick={handlePrevStep}
+                                        className="flex items-center px-3 py-1 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+                                    >
+                                        <ArrowLeftIcon className="w-4 h-4 mr-1" />
+                                        Back to Improve
+                                    </button>
+                                </div>
+                                <TemplateSelector selectedTemplate={template} onSelectTemplate={handleSelectTemplate} />
+                            </div>
+                        </div>
+                        <div className="h-[calc(100vh-200px)] overflow-y-auto bg-gray-200 p-4 rounded-lg">
                             <ResumePreview resumeRef={resumeRef} resumeData={resumeData} styles={customStyles} />
                         </div>
                     </div>
+                )}
 
-                    <div className="flex justify-between mt-8">
-                        <button
-                            onClick={() => setCurrentStep('improve')}
-                            className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                        >
-                            ← Back to Improve
-                        </button>
-                        <button
-                            onClick={handleStartOver}
-                            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                        >
-                            Start New Resume
-                        </button>
+                {/* Loading State */}
+                {isParsing && (
+                    <div className="flex justify-center items-center h-[calc(100vh-200px)]">
+                        <div className="flex flex-col items-center justify-center text-center">
+                            <svg className="animate-spin h-12 w-12 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <p className="mt-4 text-lg font-semibold text-indigo-700">Parsing your resume with AI...</p>
+                            <p className="text-sm text-gray-500">This might take a moment.</p>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
+            </main>
         </div>
     );
 };
