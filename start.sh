@@ -12,12 +12,18 @@ echo -e "${BLUE}   Resume App - Startup Script${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-# Gemini API Key (modify if needed)
-GEMINI_API_KEY="AIzaSyAib_sgR4coAKYOX2r78Ma5sfGOsZ6ijiM"
+# API Keys (read from .env or set here)
+if [ -f ".env" ]; then
+    export $(grep -v '^#' .env | grep -E '^VITE_(OPENAI|GEMINI|API)_' | xargs)
+fi
 
-if [ -z "$GEMINI_API_KEY" ]; then
-    echo -e "${RED}❌ Error: GEMINI_API_KEY is not set${NC}"
-    echo -e "${YELLOW}Set your Gemini API key in this script${NC}"
+# Fallback to hardcoded keys if .env not found
+OPENAI_API_KEY="${VITE_OPENAI_API_KEY:-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}"
+GEMINI_API_KEY="${VITE_GEMINI_API_KEY:-${VITE_API_KEY:-AIzaSyAib_sgR4coAKYOX2r78Ma5sfGOsZ6ijiM}}"
+
+if [ -z "$OPENAI_API_KEY" ] && [ -z "$GEMINI_API_KEY" ]; then
+    echo -e "${RED}❌ Error: No API key found${NC}"
+    echo -e "${YELLOW}Set VITE_OPENAI_API_KEY or VITE_GEMINI_API_KEY in .env${NC}"
     exit 1
 fi
 
@@ -33,7 +39,11 @@ if [ "$(docker ps -q -f name=resume-app)" ]; then
 fi
 
 echo -e "${BLUE}🔨 Building Docker image...${NC}"
-docker build --build-arg GEMINI_API_KEY="$GEMINI_API_KEY" -t resume-app:local . --quiet
+docker build \
+  --build-arg OPENAI_API_KEY="$OPENAI_API_KEY" \
+  --build-arg GEMINI_API_KEY="$GEMINI_API_KEY" \
+  --build-arg API_KEY="$GEMINI_API_KEY" \
+  -t resume-app:local . --quiet
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}❌ Build failed${NC}"
