@@ -1,8 +1,7 @@
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import type { ResumeData, CustomStyles } from '../types';
-
 // Initialize with Gemini API key
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+const GEMINI_API_KEY = import.meta.env.VITE_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 // Retry configuration
