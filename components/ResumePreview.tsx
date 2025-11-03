@@ -19,23 +19,6 @@ const ResumePreview: React.FC<ResumePreviewProps> = React.memo(({ resumeRef, res
                 pageBreakInside: 'avoid',
             }}
         >
-            <style>{`
-                @media print {
-                    .resume-section {
-                        page-break-inside: avoid;
-                        break-inside: avoid;
-                    }
-                    .resume-section h2 {
-                        page-break-after: avoid;
-                        break-after: avoid;
-                    }
-                    .experience-item, .education-item, .project-item {
-                        page-break-inside: avoid;
-                        break-inside: avoid;
-                    }
-                }
-            `}</style>
-            
             {/* Header */}
             <header className={`text-center pb-2 mb-4 ${styles.header || ''}`}>
                 <h1 className={`text-3xl font-bold mb-2 ${styles.name || ''}`}>{personalInfo.name || 'Your Name'}</h1>
