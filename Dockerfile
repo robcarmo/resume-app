@@ -1,4 +1,3 @@
-
 # Stage 1: Build the React application
 FROM node:20-alpine AS builder
 
@@ -15,9 +14,15 @@ RUN npm install
 # Copy the rest of the application source code
 COPY . .
 
-# Accept Gemini API key as build argument
+# Accept API keys as build arguments
+ARG OPENAI_API_KEY
 ARG GEMINI_API_KEY
-ENV GEMINI_API_KEY=${GEMINI_API_KEY}
+ARG API_KEY
+
+# Set environment variables with VITE_ prefix for client-side access
+ENV VITE_OPENAI_API_KEY=${OPENAI_API_KEY}
+ENV VITE_GEMINI_API_KEY=${GEMINI_API_KEY}
+ENV VITE_API_KEY=${API_KEY}
 
 # Build the application
 # This will create a 'dist' folder with the static files

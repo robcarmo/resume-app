@@ -13,7 +13,7 @@ echo -e "${BLUE}========================================${NC}"
 echo ""
 
 # Gemini API Key (modify if needed)
-GEMINI_API_KEY="AIzaSyCgOjn1-fgGq93Z_P6KCLscwtTM_taLL4Y"
+GEMINI_API_KEY="AIzaSyAib_sgR4coAKYOX2r78Ma5sfGOsZ6ijiM"
 
 if [ -z "$GEMINI_API_KEY" ]; then
     echo -e "${RED}❌ Error: GEMINI_API_KEY is not set${NC}"
