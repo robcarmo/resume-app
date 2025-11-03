@@ -45,4 +45,58 @@ body {
     print-color-adjust: exact !important;
     color-adjust: exact !important;
   }
+
+  /* ===== PAGE BREAK CONTROLS ===== */
+  
+  /* Keep sections together - avoid breaking inside them */
+  .resume-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  /* Keep section headings with their content */
+  .resume-section h2 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+  
+  /* Keep individual items together */
+  .experience-item,
+  .education-item,
+  .project-item {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    orphans: 3;
+    widows: 3;
+  }
+  
+  /* Explicit page break class - AI can add this before sections */
+  .page-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+  
+  /* Optional: page break after */
+  .page-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+  
+  /* Prevent page breaks after headings */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+  
+  /* Keep lists together better */
+  ul, ol {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  /* Minimum lines at top/bottom of pages */
+  p {
+    orphans: 3;
+    widows: 3;
+  }
 }

@@ -7,6 +7,7 @@ import PdfUploader from './components/PdfUploader';
 import { DownloadIcon, DocumentArrowDownIcon, PrinterIcon } from './components/icons';
 import OriginalResumeViewer from './components/OriginalResumeViewer';
 import ContentImprover from './components/ContentImprover';
+import AIProviderSettings from './components/AIProviderSettings';
 
 type WorkflowStep = 'upload' | 'improve' | 'format';
 
@@ -486,6 +487,7 @@ const App: React.FC = () => {
                                 <span className="w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium mr-2">3</span>
                                 Format
                             </div>
+                            <AIProviderSettings />
                         </div>
                         {currentStep === 'format' && resumeData && (
                             <div className="flex space-x-2">
