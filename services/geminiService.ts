@@ -1,9 +1,25 @@
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
+import OpenAI from 'openai';
 import type { ResumeData, CustomStyles } from '../types';
 
-// Initialize with Gemini API key
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+// Initialize AI clients with proper Vite environment variables
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY || '';
+const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || '';
+
+// Initialize clients
+const geminiAI = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
+const openaiClient = OPENAI_API_KEY ? new OpenAI({ 
+    apiKey: OPENAI_API_KEY,
+    dangerouslyAllowBrowser: true 
+}) : null;
+
+// Determine which provider to use (prioritize OpenAI)
+const useOpenAI = !!openaiClient;
+const useGemini = !!geminiAI;
+
+if (!useOpenAI && !useGemini) {
+    console.error('No AI provider configured. Please set VITE_OPENAI_API_KEY or VITE_GEMINI_API_KEY');
+}
 
 // Retry configuration
 interface RetryConfig {
@@ -217,9 +233,7 @@ const normalizeResumeData = (data: Partial<ResumeData>): ResumeData => {
 
 
 export const parseResumeText = async (resumeText: string): Promise<ResumeData> => {
-    let response: GenerateContentResponse | undefined;
     try {
-        // Robust, concise mapping of many real-world section title variants (case-insensitive)
         const prompt = `Extract resume information into JSON using the provided schema. Standardize section headers to these targets:
 
 - experience: Professional Experience, Work Experience, Employment History, Work History, Career History, Roles, Positions, Experience, PROFESSIONAL EXPERIENCE
@@ -239,46 +253,65 @@ Rules:
 
 Resume:
 ${resumeText}`;
-        // Direct API call for faster parsing (no retry)
-        response = await ai.models.generateContent({
-            model: "gemini-2.5-pro",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: resumeDataSchema,
-            },
-        });
-        
-        // More robust cleanup of the AI's response to extract the JSON object.
-        let jsonText = response.text.trim();
-        const firstBrace = jsonText.indexOf('{');
-        const lastBrace = jsonText.lastIndexOf('}');
 
-        if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
-            console.error("AI response did not contain a valid JSON object.", { responseText: jsonText });
-            throw new Error("The AI's response was malformed and did not contain valid data.");
+        let parsedData: Partial<ResumeData>;
+
+        if (useOpenAI && openaiClient) {
+            // Use OpenAI with structured output
+            const response = await openaiClient.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are an expert resume parser. Extract resume information into the exact JSON schema provided. Return only valid JSON."
+                    },
+                    {
+                        role: "user",
+                        content: prompt
+                    }
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.1
+            });
+
+            const jsonText = response.choices[0]?.message?.content?.trim() || '{}';
+            parsedData = JSON.parse(jsonText) as Partial<ResumeData>;
+
+        } else if (useGemini && geminiAI) {
+            // Use Gemini with structured output
+            const response = await geminiAI.models.generateContent({
+                model: "gemini-2.5-pro",
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: resumeDataSchema,
+                },
+            });
+
+            let jsonText = response.text.trim();
+            const firstBrace = jsonText.indexOf('{');
+            const lastBrace = jsonText.lastIndexOf('}');
+
+            if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
+                throw new Error("The AI's response was malformed and did not contain valid data.");
+            }
+            
+            jsonText = jsonText.substring(firstBrace, lastBrace + 1);
+            parsedData = JSON.parse(jsonText) as Partial<ResumeData>;
+
+        } else {
+            throw new Error("No AI provider available. Please configure VITE_OPENAI_API_KEY or VITE_GEMINI_API_KEY.");
         }
-        
-        jsonText = jsonText.substring(firstBrace, lastBrace + 1);
-        
-        const parsedData = JSON.parse(jsonText) as Partial<ResumeData>;
 
-        // Ensure all array fields exist even if empty by normalizing the data
         return normalizeResumeData(parsedData);
 
     } catch (error) {
-        console.error("Error parsing resume with Gemini:", error);
+        console.error("Error parsing resume:", error);
         
-        // Improved error handling to give more specific feedback.
         if (error instanceof SyntaxError) {
-            console.error("The AI returned text that could not be parsed as JSON.");
-            if (response?.text) {
-                console.error("Received text from AI:", response.text);
-            }
             throw new Error("Failed to parse the resume. The AI's response was not in a valid JSON format. This can sometimes happen with unique resume layouts.");
         }
         
-        // Basic check for API-related errors.
         if (error && typeof error === 'object' && 'message' in error) {
             const message = String(error.message).toLowerCase();
             if (message.includes('api key')) {
@@ -286,36 +319,18 @@ ${resumeText}`;
             }
         }
         
-        // Fallback for other errors
         throw new Error("Failed to extract data from the resume. The AI model could not understand the format. Please ensure your file is a text-based document (not an image) and try again.");
     }
 };
 
 export const improveResumeContent = async (resumeData: ResumeData, prompt: string): Promise<ResumeData> => {
     try {
-        // Create a deep copy to ensure we're working with fresh data
         const currentData = JSON.parse(JSON.stringify(resumeData));
-        
-        // Count experience items for explicit targeting
-        const expCount = currentData.experience?.length || 0;
         
         const fullPrompt = `You are an expert resume writer. Revise the resume JSON based on the user's request.
 
 **YOUR TASK:**
-Analyze the user's request and apply changes to ALL relevant sections. If the request mentions "entire resume", "all sections", or general improvements, update ALL applicable fields (summary, experience descriptions, skills, etc.).
-
-**CRITICAL INSTRUCTIONS:**
-- When improving "professional summary" or "summary": modify the summary section
-- When improving "experience", "professional experience", or "work experience": modify ALL ${expCount} experience items
-- When improving "resume" generally: modify BOTH summary AND all experience items
-
-**EXPERIENCE MODIFICATION REQUIREMENTS:**
-You MUST modify ALL of these experience items (indices 0 to ${expCount - 1}):
-${currentData.experience?.map((exp, index) => `- Experience item ${index}: ${exp.jobTitle} at ${exp.company}`).join('\n') || ''}
-
-**BEFORE/AFTER EXAMPLE:**
-Before: "Responsible for managing team"
-After: "Led cross-functional team of 8 engineers, driving 25% improvement in delivery timelines"
+Analyze the user's request and apply changes to ALL relevant sections. If the request mentions "entire resume", "all sections", or general improvements, update ALL applicable fields (Professional Summary, Professional Experience, Experience, skills, etc.).
 
 **CRITICAL - DATA PRESERVATION:**
 1. NEVER remove sections, jobs, education, skills, or certifications
@@ -324,8 +339,17 @@ After: "Led cross-functional team of 8 engineers, driving 25% improvement in del
 4. NEVER empty any section that had content
 5. Return COMPLETE JSON with all original structure
 
+**SECTION TARGETING:**
+- Professional Summary: personalInfo.summary
+- Professional Experience: experience array (ALL items)
+- Experience: experience array (ALL items)
+- Work Experience: experience array (ALL items)
+- Skills: skills array
+- Projects: projects array
+- Education: education array
+
 **WHEN SHORTENING/CONDENSING:**
-- Apply to ALL text fields: summary, experience descriptions, project descriptions
+- Apply to ALL text fields: summary, ALL experience descriptions, ALL project descriptions
 - Make bullet points concise but keep ALL of them
 - Use stronger action verbs to reduce word count
 - Remove filler words but keep key accomplishments
@@ -333,25 +357,23 @@ After: "Led cross-functional team of 8 engineers, driving 25% improvement in del
 - Preserve section structure (if 5 bullet points, keep 5 bullet points)
 
 **WHEN IMPROVING ACTION VERBS:**
-- Update verbs in experience.description arrays
-- Strengthen language throughout all job descriptions
+- Update verbs in ALL experience.description arrays
+- Strengthen language throughout ALL job descriptions
 - Apply consistently across ALL experience items
 
 **WHEN IMPROVING OVERALL:**
 - Update summary for impact
-- Enhance ALL experience descriptions
+- Enhance ALL experience descriptions (every job, every bullet point)
 - Improve ALL project descriptions
-- Make changes across the entire resume, not just one section
+- Make changes across the entire resume, not just the first section
 
 **ENHANCEMENT RULES:**
 - ACTUALLY MAKE CHANGES - don't be too conservative
 - Apply requested improvements to ALL relevant fields
-- Improve clarity and impact across all sections
+- Improve clarity and impact across ALL sections
 - Strengthen language without changing facts
 - Maintain professional tone
 - Keep all technical details
-
-**FINAL CHECK:** Before returning, verify you modified ALL requested sections and ALL experience items.
 
 **User Request:**
 "${prompt}"
@@ -361,19 +383,45 @@ ${JSON.stringify(currentData, null, 2)}
 
 **Output:** Return the complete, improved JSON with changes applied to ALL relevant sections.`;
 
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-pro",
-            contents: fullPrompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: resumeDataSchema,
-            },
-        });
+        let newResumeData: Partial<ResumeData>;
+
+        if (useOpenAI && openaiClient) {
+            const response = await openaiClient.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are an expert resume writer. Improve the resume content based on the user's request while preserving all data structure and applying changes to ALL relevant sections."
+                    },
+                    {
+                        role: "user",
+                        content: fullPrompt
+                    }
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.3
+            });
+
+            const jsonText = response.choices[0]?.message?.content?.trim() || '{}';
+            newResumeData = JSON.parse(jsonText) as Partial<ResumeData>;
+
+        } else if (useGemini && geminiAI) {
+            const response = await geminiAI.models.generateContent({
+                model: "gemini-2.5-pro",
+                contents: fullPrompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: resumeDataSchema,
+                },
+            });
+            
+            const jsonText = response.text.trim();
+            newResumeData = JSON.parse(jsonText) as Partial<ResumeData>;
+
+        } else {
+            throw new Error("No AI provider available.");
+        }
         
-        const jsonText = response.text.trim();
-        const newResumeData = JSON.parse(jsonText) as Partial<ResumeData>;
-        
-        // Enhanced safety check: ensure no data loss by comparing with original
         const safeData = normalizeResumeData(newResumeData);
         
         // Additional safety checks to prevent data loss
@@ -397,8 +445,7 @@ ${JSON.stringify(currentData, null, 2)}
         return finalData;
 
     } catch (error) {
-        console.error("Error improving content with Gemini:", error);
-        // Return original data if improvement fails to prevent data loss
+        console.error("Error improving content:", error);
         return resumeData;
     }
 };
@@ -406,52 +453,69 @@ ${JSON.stringify(currentData, null, 2)}
 
 export const generateStyles = async (resumeData: ResumeData, currentStyles: CustomStyles, prompt: string): Promise<CustomStyles> => {
     try {
-        const fullPrompt = `
-You are an expert web designer who specializes in Tailwind CSS. Your task is to act as a style engine, modifying a JSON object of Tailwind CSS classes based on a user's natural language request.
+        const fullPrompt = `You are an expert web designer who specializes in Tailwind CSS. Your task is to act as a style engine, modifying a JSON object of Tailwind CSS classes based on a user's natural language request.
 
 **Core Task:**
 Analyze the user's request and intelligently update the provided JSON object of styles. You must add, remove, or replace Tailwind classes to achieve the desired effect while preserving existing, unrelated styles.
 
 **CRITICAL RULES:**
-1.  **Return a Complete JSON Object**: You MUST return the complete, valid JSON object that conforms to the provided schema. It must include ALL original keys from the 'currentStyles' input. Do not omit any keys.
-2.  **Preserve Existing Styles**: When modifying a style, do NOT delete existing classes unless they are directly contradicted by the user's request. For example, if the user asks to "make the name bigger", and the current style is "text-4xl font-bold", the new style should be "text-5xl font-bold". The 'font-bold' class was preserved.
-3.  **Intelligent Class Replacement**: If the user requests a change that conflicts with an existing class (e.g., changing font size from 'text-4xl' to 'text-5xl', or color from 'text-gray-800' to 'text-blue-600'), you should replace the old class with the new one.
-4.  **Valid Tailwind Only**: Only use valid Tailwind CSS classes. For fonts, use 'font-serif' or 'font-sans'. For colors, use standard Tailwind color utilities (e.g., 'text-blue-600', 'bg-indigo-100').
-5.  **No Action on Ambiguity**: If the user's request is unclear, unrelated to styling, or cannot be reasonably translated into Tailwind classes, you MUST return the 'currentStyles' object completely unmodified.
+1. Return a Complete JSON Object: You MUST return the complete, valid JSON object that conforms to the provided schema. It must include ALL original keys from the 'currentStyles' input. Do not omit any keys.
+2. Preserve Existing Styles: When modifying a style, do NOT delete existing classes unless they are directly contradicted by the user's request.
+3. Intelligent Class Replacement: If the user requests a change that conflicts with an existing class, you should replace the old class with the new one.
+4. Valid Tailwind Only: Only use valid Tailwind CSS classes. For fonts, use 'font-serif' or 'font-sans'. For colors, use standard Tailwind color utilities.
+5. No Action on Ambiguity: If the user's request is unclear, unrelated to styling, or cannot be reasonably translated into Tailwind classes, you MUST return the 'currentStyles' object completely unmodified.
 
-**INPUTS:**
-
-**1. User's Request:**
+**User's Request:**
 "${prompt}"
 
-**2. Current Styles (JSON object):**
+**Current Styles (JSON object):**
 ${JSON.stringify(currentStyles, null, 2)}
 
-**EXAMPLE:**
--   **User Request**: "Make the section titles underlined and dark green."
--   **Current 'sectionTitle' Style**: "text-xl font-bold text-gray-800 border-b-2 border-gray-800 pb-1 mb-3"
--   **Correct Updated 'sectionTitle' Style**: "text-xl font-bold text-green-800 border-b-2 border-gray-800 pb-1 mb-3 underline"
--   **Explanation**: You added 'underline' and replaced 'text-gray-800' with 'text-green-800', while keeping all other classes.
+Now, based on the user's request, provide the updated and complete JSON object.`;
 
-Now, based on the user's request, provide the updated and complete JSON object.
-`;
+        let newStyles: CustomStyles;
 
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-pro",
-            contents: fullPrompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: styleSchema,
-            },
-        });
-        
-        const jsonText = response.text.trim();
-        const newStyles = JSON.parse(jsonText) as CustomStyles;
+        if (useOpenAI && openaiClient) {
+            const response = await openaiClient.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are an expert web designer specializing in Tailwind CSS. Modify the provided styles JSON based on the user's request while preserving existing styles."
+                    },
+                    {
+                        role: "user",
+                        content: fullPrompt
+                    }
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.1
+            });
+
+            const jsonText = response.choices[0]?.message?.content?.trim() || '{}';
+            newStyles = JSON.parse(jsonText) as CustomStyles;
+
+        } else if (useGemini && geminiAI) {
+            const response = await geminiAI.models.generateContent({
+                model: "gemini-2.5-pro",
+                contents: fullPrompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: styleSchema,
+                },
+            });
+            
+            const jsonText = response.text.trim();
+            newStyles = JSON.parse(jsonText) as CustomStyles;
+
+        } else {
+            throw new Error("No AI provider available.");
+        }
         
         return { ...currentStyles, ...newStyles };
 
     } catch (error) {
-        console.error("Error generating styles with Gemini:", error);
+        console.error("Error generating styles:", error);
         throw new Error("Failed to generate styles. The AI could not process the request. Please try a different prompt.");
     }
 };

@@ -28,7 +28,7 @@ const ContentImprover: React.FC<ContentImproverProps> = ({ onImprove, isLoading 
             <div className="flex flex-wrap gap-2 mb-3">
                 <button
                     type="button"
-                    onClick={() => setPrompt('Make all bullet points more concise without losing key information')}
+                    onClick={() => setPrompt('Make all bullet points more concise without losing key information across all sections')}
                     disabled={isLoading}
                     className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition disabled:opacity-50"
                 >
@@ -36,7 +36,7 @@ const ContentImprover: React.FC<ContentImproverProps> = ({ onImprove, isLoading 
                 </button>
                 <button
                     type="button"
-                    onClick={() => setPrompt('Improve action verbs in experience section')}
+                    onClick={() => setPrompt('Improve action verbs throughout all experience sections and professional experience')}
                     disabled={isLoading}
                     className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition disabled:opacity-50"
                 >
@@ -44,11 +44,11 @@ const ContentImprover: React.FC<ContentImproverProps> = ({ onImprove, isLoading 
                 </button>
                 <button
                     type="button"
-                    onClick={() => setPrompt('Rewrite summary to be more impactful')}
+                    onClick={() => setPrompt('Rewrite professional summary and all experience descriptions to be more impactful')}
                     disabled={isLoading}
                     className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition disabled:opacity-50"
                 >
-                    Improve Summary
+                    Improve All
                 </button>
             </div>
             
@@ -56,7 +56,7 @@ const ContentImprover: React.FC<ContentImproverProps> = ({ onImprove, isLoading 
                 <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="e.g., Shorten all descriptions while keeping key achievements and metrics"
+                    placeholder="e.g., Shorten all descriptions while keeping key achievements and metrics across all sections including professional summary and experience"
                     className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 transition text-sm"
                     rows={3}
                     disabled={isLoading}
