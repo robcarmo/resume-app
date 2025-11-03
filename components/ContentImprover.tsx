@@ -13,6 +13,7 @@ const ContentImprover: React.FC<ContentImproverProps> = ({ onImprove, isLoading 
         e.preventDefault();
         if (prompt.trim() && !isLoading) {
             onImprove(prompt);
+            setPrompt(''); // Clear the prompt after submission
         }
     };
 
