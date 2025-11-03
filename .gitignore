@@ -37,3 +37,7 @@ dist-ssr
 dev-server.log
 .vite.pid
 *.pdf
+
+# Scripts with API keys (use .example versions)
+start.sh
+stop.sh
