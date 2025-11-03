@@ -296,6 +296,9 @@ export const improveResumeContent = async (resumeData: ResumeData, prompt: strin
         // Create a deep copy to ensure we're working with fresh data
         const currentData = JSON.parse(JSON.stringify(resumeData));
         
+        // Count experience items for explicit targeting
+        const expCount = currentData.experience?.length || 0;
+        
         const fullPrompt = `You are an expert resume writer. Revise the resume JSON based on the user's request.
 
 **SCOPE OF CHANGES - CRITICAL:**
