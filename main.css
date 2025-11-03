@@ -6,3 +6,43 @@
 body {
   font-family: 'Inter', sans-serif;
 }
+
+/* Print styles - show only resume content */
+@media print {
+  /* Reset page margins */
+  @page {
+    margin: 0;
+    size: A4;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  /* Hide only app UI elements (not resume content) */
+  .no-print,
+  nav,
+  button {
+    display: none !important;
+  }
+
+  /* Remove shadows and adjust resume for print - keep same padding as preview */
+  [data-resume-content] {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 auto !important;
+    width: 210mm !important;
+    min-height: 297mm !important;
+    max-width: 210mm !important;
+    /* Keep original padding: px-12 py-10 from preview */
+  }
+
+  /* Preserve colors */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+}

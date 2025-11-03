@@ -4,7 +4,7 @@ import { parseResumeText, improveResumeContent } from './services/geminiService'
 import ResumePreview from './components/ResumePreview';
 import TemplateSelector from './components/TemplateSelector';
 import PdfUploader from './components/PdfUploader';
-import { DownloadIcon, DocumentArrowDownIcon } from './components/icons';
+import { DownloadIcon, DocumentArrowDownIcon, PrinterIcon } from './components/icons';
 import OriginalResumeViewer from './components/OriginalResumeViewer';
 import ContentImprover from './components/ContentImprover';
 
@@ -111,6 +111,10 @@ const App: React.FC = () => {
         } finally {
             setIsImproving(false);
         }
+    };
+
+    const handlePrint = () => {
+        window.print();
     };
 
     const handleDownloadPdf = async () => {
@@ -486,6 +490,13 @@ const App: React.FC = () => {
                         {currentStep === 'format' && resumeData && (
                             <div className="flex space-x-2">
                                 <button
+                                    onClick={handlePrint}
+                                    className="flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                                >
+                                    <PrinterIcon className="w-5 h-5 mr-2" />
+                                    Print
+                                </button>
+                                <button
                                     onClick={handleDownloadDocx}
                                     className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                 >
@@ -577,13 +588,13 @@ const App: React.FC = () => {
             {/* Step 3: Format & Download */}
             {currentStep === 'format' && resumeData && (
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    <div className="text-center mb-8">
+                    <div className="text-center mb-8 no-print">
                         <h2 className="text-3xl font-bold text-gray-900 mb-4">Format & Download</h2>
                         <p className="text-lg text-gray-600">Choose your template and download your improved resume</p>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-1 space-y-6">
+                        <div className="lg:col-span-1 space-y-6 no-print">
                             <TemplateSelector selectedTemplate={template} onSelectTemplate={handleSelectTemplate} />
                         </div>
                         <div className="lg:col-span-2">
@@ -591,7 +602,7 @@ const App: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="flex justify-between mt-8">
+                    <div className="flex justify-between mt-8 no-print">
                         <button
                             onClick={() => setCurrentStep('improve')}
                             className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
