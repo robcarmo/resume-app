@@ -301,57 +301,44 @@ export const improveResumeContent = async (resumeData: ResumeData, prompt: strin
         
         const fullPrompt = `You are an expert resume writer. Revise the resume JSON based on the user's request.
 
-**YOUR TASK:**
-Analyze the user's request and apply changes to ALL relevant sections. If the request mentions "entire resume", "all sections", or general improvements, update ALL applicable fields (summary, experience descriptions, skills, etc.).
+**SCOPE OF CHANGES - CRITICAL:**
+Apply improvements ONLY to these two sections:
+1. personalInfo.summary (Professional Summary)
+2. experience[].description (Work Experience bullet points)
 
-**CRITICAL INSTRUCTIONS:**
-- When improving "professional summary" or "summary": modify the summary section
-- When improving "experience", "professional experience", or "work experience": modify ALL ${expCount} experience items
-- When improving "resume" generally: modify BOTH summary AND all experience items
+**DO NOT MODIFY:**
+- Projects, keyArchitecturalProjects, education, skills, certifications
+- Job titles, company names, dates, locations, names, emails, phone numbers
+- Any IDs or structural elements
 
-**EXPERIENCE MODIFICATION REQUIREMENTS:**
-You MUST modify ALL of these experience items (indices 0 to ${expCount - 1}):
-${currentData.experience?.map((exp, index) => `- Experience item ${index}: ${exp.jobTitle} at ${exp.company}`).join('\n') || ''}
+**WHAT TO IMPROVE:**
 
-**BEFORE/AFTER EXAMPLE:**
-Before: "Responsible for managing team"
-After: "Led cross-functional team of 8 engineers, driving 25% improvement in delivery timelines"
+For personalInfo.summary:
+- Strengthen opening statement
+- Use powerful action verbs
+- Highlight key achievements and expertise
+- Make it concise and impactful
+- Keep it professional and focused
 
-**CRITICAL - DATA PRESERVATION:**
-1. NEVER remove sections, jobs, education, skills, or certifications
-2. PRESERVE all dates, company names, job titles, degrees, and IDs
-3. Keep ALL array items - if experience has 3 jobs, output must have 3 jobs
-4. NEVER empty any section that had content
-5. Return COMPLETE JSON with all original structure
+For experience[].description arrays:
+- Replace weak verbs (managed, worked on, helped) with strong verbs (led, architected, spearheaded, drove, optimized)
+- Remove filler words (very, really, basically, essentially)
+- Make passive voice active ("was responsible for" → "led")
+- Add impact where appropriate
+- Keep all bullet points (don't remove any)
+- Maintain technical accuracy
+- Preserve metrics and numbers
 
-**WHEN SHORTENING/CONDENSING:**
-- Apply to ALL text fields: summary, experience descriptions, project descriptions
-- Make bullet points concise but keep ALL of them
-- Use stronger action verbs to reduce word count
-- Remove filler words but keep key accomplishments
-- Keep all technical terms, metrics, and achievements
-- Preserve section structure (if 5 bullet points, keep 5 bullet points)
+**EXAMPLES:**
 
-**WHEN IMPROVING ACTION VERBS:**
-- Update verbs in experience.description arrays
-- Strengthen language throughout all job descriptions
-- Apply consistently across ALL experience items
+Before: "Managed a team of developers"
+After: "Led a cross-functional team of 5 developers"
 
-**WHEN IMPROVING OVERALL:**
-- Update summary for impact
-- Enhance ALL experience descriptions
-- Improve ALL project descriptions
-- Make changes across the entire resume, not just one section
+Before: "Worked on improving system performance"
+After: "Optimized system performance, reducing load time by 40%"
 
-**ENHANCEMENT RULES:**
-- ACTUALLY MAKE CHANGES - don't be too conservative
-- Apply requested improvements to ALL relevant fields
-- Improve clarity and impact across all sections
-- Strengthen language without changing facts
-- Maintain professional tone
-- Keep all technical details
-
-**FINAL CHECK:** Before returning, verify you modified ALL requested sections and ALL experience items.
+Before: "Was responsible for database design"
+After: "Architected scalable database solutions"
 
 **User Request:**
 "${prompt}"
@@ -359,7 +346,7 @@ After: "Led cross-functional team of 8 engineers, driving 25% improvement in del
 **Current Resume (JSON):**
 ${JSON.stringify(currentData, null, 2)}
 
-**Output:** Return the complete, improved JSON with changes applied to ALL relevant sections.`;
+**IMPORTANT:** Return the complete JSON. Only modify personalInfo.summary and experience[].description arrays. Keep everything else exactly as is.`;
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-pro",
